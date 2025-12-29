@@ -93,6 +93,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     private getCardFrame(data: Card | FoundationPile) {
+        if (data.suit === null) {
+            return CARD_BACK_FRAME; // Fallback for unassigned foundation piles
+        }
         return SUIT_FRAMES[data.suit] + (data.value - 1);
     }
 
@@ -136,20 +139,20 @@ export class GameScene extends Phaser.Scene {
 
     private calculateCardSpacing(pileSize: number): number {
         if (pileSize <= 1) return 0;
-        
+
         // Calculate the required height for all cards with max spacing
         const cardHeight = CARD_HEIGHT * SCALE;
         const requiredHeight = cardHeight + (pileSize - 1) * MAX_CARD_SPACING;
-        
+
         // If it fits, use max spacing
         if (requiredHeight <= MAX_TABLEAU_HEIGHT) {
             return MAX_CARD_SPACING;
         }
-        
+
         // Otherwise, calculate compressed spacing
         const availableSpaceForSpacing = MAX_TABLEAU_HEIGHT - cardHeight;
         const spacing = Math.floor(availableSpaceForSpacing / (pileSize - 1));
-        
+
         // Ensure spacing doesn't go below minimum
         return Math.max(spacing, MIN_CARD_SPACING);
     }
@@ -250,17 +253,21 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createDropZones() {
-        let zone = this.add.zone(350, 0, 270, 85).setOrigin(0).setRectangleDropZone(270, 85).setData({
-            zoneType: ZONE_TYPE.FOUNDATION
-        });
+        // Create 4 separate foundation zones
+        for (let i = 0; i < 4; i++) {
+            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i], FOUNDATION_PILE_Y_POSITION, 65, 85).setOrigin(0).setRectangleDropZone(65, 85).setData({
+                zoneType: ZONE_TYPE.FOUNDATION,
+                pileIndex: i
+            });
 
-        if (DEBUG) {
-            this.add.rectangle(zone.x, zone.y, zone.width, zone.height, 0xff0000, 0.2).setOrigin(0);
+            if (DEBUG) {
+                this.add.rectangle(zone.x, zone.y, zone.width, zone.height, 0xff0000, 0.2).setOrigin(0);
+            }
         }
 
         // add zones for tableau piles
         for (let i = 0; i < 7; i++) {
-            zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, 75.5, 268).setOrigin(0).setRectangleDropZone(75.5, 268).setData({
+            const zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, 75.5, 268).setOrigin(0).setRectangleDropZone(75.5, 268).setData({
                 zoneType: ZONE_TYPE.TABLEAU,
                 pileIndex: i
             }).setDepth(-1);
@@ -274,7 +281,8 @@ export class GameScene extends Phaser.Scene {
         this.input.on(Phaser.Input.Events.DROP, (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropZone: Phaser.GameObjects.Zone) => {
             const zoneType = dropZone.getData('zoneType') as ZoneType;
             if (zoneType === ZONE_TYPE.FOUNDATION) {
-                this.handleMoveCardToFoundation(gameObject);
+                const targetFoundationIndex = dropZone.getData('pileIndex') as number;
+                this.handleMoveCardToFoundation(gameObject, targetFoundationIndex);
             } else if (zoneType === ZONE_TYPE.TABLEAU) {
                 const targetTableauIndex = dropZone.getData('pileIndex') as number;
                 this.handleMoveCardToTableau(gameObject, targetTableauIndex);
@@ -282,16 +290,16 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    private handleMoveCardToFoundation(card: Phaser.GameObjects.Image) {
+    private handleMoveCardToFoundation(card: Phaser.GameObjects.Image, targetFoundationIndex: number) {
         let isValidMove = false;
         let isCardFomDiscardPile = false;
 
         const tableauPileIndex = card.getData('pileIndex') as number | undefined;
         if (tableauPileIndex === undefined) {
-            isValidMove = this.solitaire.playDiscardPileCardToFoundation();
+            isValidMove = this.solitaire.playDiscardPileCardToFoundation(targetFoundationIndex);
             isCardFomDiscardPile = true;
         } else {
-            isValidMove = this.solitaire.moveTableauCardToFoundation(tableauPileIndex);
+            isValidMove = this.solitaire.moveTableauCardToFoundation(tableauPileIndex, targetFoundationIndex);
         }
         if (!isValidMove) {
             return;
@@ -391,7 +399,7 @@ export class GameScene extends Phaser.Scene {
     private repositionTableauCards(pileIndex: number) {
         const container = this.tableauContainers[pileIndex];
         const spacing = this.calculateCardSpacing(container.length);
-        
+
         for (let i = 0; i < container.length; i++) {
             const card = container.getAt<Phaser.GameObjects.Image>(i);
             const yPos = i * spacing;

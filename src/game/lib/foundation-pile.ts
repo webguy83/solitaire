@@ -1,10 +1,10 @@
 import { CardSuit, CardValue } from "./common";
 
 export class FoundationPile {
-    private _suit: CardSuit;
+    private _suit: CardSuit | null;
     private _currentValue: CardValue | 0;
 
-    constructor(suit: CardSuit) {
+    constructor(suit: CardSuit | null = null) {
         this._suit = suit;
         this._currentValue = 0;
     }
@@ -17,8 +17,19 @@ export class FoundationPile {
         return this._currentValue;
     }
 
+    get isAssigned() {
+        return this._suit !== null;
+    }
+
     reset() {
+        this._suit = null;
         this._currentValue = 0;
+    }
+
+    assignSuit(suit: CardSuit) {
+        if (this._suit === null) {
+            this._suit = suit;
+        }
     }
 
     addCard() {

@@ -1,23 +1,21 @@
 import { Card } from "./card";
-import { CARD_SUIT } from "./common";
 import { Deck } from "./deck";
 import { FoundationPile } from "./foundation-pile";
 
 export class Solitaire {
 
     private _deck: Deck;
-    private _foundationPileSpade: FoundationPile;
-    private _foundationPileHeart: FoundationPile;
-    private _foundationPileClub: FoundationPile;
-    private _foundationPileDiamond: FoundationPile;
+    private _foundationPiles: FoundationPile[];
     private _tableauPiles: Card[][];
 
     constructor() {
         this._deck = new Deck();
-        this._foundationPileSpade = new FoundationPile(CARD_SUIT.SPADE);
-        this._foundationPileHeart = new FoundationPile(CARD_SUIT.HEART);
-        this._foundationPileClub = new FoundationPile(CARD_SUIT.CLUB);
-        this._foundationPileDiamond = new FoundationPile(CARD_SUIT.DIAMOND);
+        this._foundationPiles = [
+            new FoundationPile(),
+            new FoundationPile(),
+            new FoundationPile(),
+            new FoundationPile()
+        ];
         this._tableauPiles = [[], [], [], [], [], [], []];
     }
 
@@ -34,22 +32,16 @@ export class Solitaire {
     }
 
     get foundationPiles() {
-        return [this._foundationPileSpade, this._foundationPileHeart, this._foundationPileClub, this._foundationPileDiamond];
+        return this._foundationPiles;
     }
 
     get isWonGame() {
-        return this._foundationPileSpade.value === 13 &&
-            this._foundationPileHeart.value === 13 &&
-            this._foundationPileClub.value === 13 &&
-            this._foundationPileDiamond.value === 13;
+        return this._foundationPiles.every(pile => pile.value === 13);
     }
 
     newGame() {
         this._deck.reset();
-        this._foundationPileSpade.reset();
-        this._foundationPileHeart.reset();
-        this._foundationPileClub.reset();
-        this._foundationPileDiamond.reset();
+        this._foundationPiles.forEach(pile => pile.reset());
         this._tableauPiles = [[], [], [], [], [], [], []];
 
         for (let i = 0; i < 7; i++) {
@@ -83,17 +75,17 @@ export class Solitaire {
         return true;
     }
 
-    playDiscardPileCardToFoundation() {
+    playDiscardPileCardToFoundation(targetFoundationIndex: number) {
         const card = this._deck.discardPile[this._deck.discardPile.length - 1];
         if (!card) {
             return false;
         }
 
-        if (!this.isValidFoundationMove(card)) {
+        if (!this.isValidFoundationMove(card, targetFoundationIndex)) {
             return false;
         }
 
-        this.addCardToFoundationPile(card);
+        this.addCardToFoundationPile(card, targetFoundationIndex);
         this._deck.discardPile.pop();
 
         return true;
@@ -116,18 +108,18 @@ export class Solitaire {
         return true;
     }
 
-    moveTableauCardToFoundation(tableauPileIndex: number) {
+    moveTableauCardToFoundation(tableauPileIndex: number, targetFoundationIndex: number) {
         const tableauPile = this._tableauPiles[tableauPileIndex];
         const card = tableauPile[tableauPile.length - 1];
         if (!card) {
             return false;
         }
 
-        if (!this.isValidFoundationMove(card)) {
+        if (!this.isValidFoundationMove(card, targetFoundationIndex)) {
             return false;
         }
 
-        this.addCardToFoundationPile(card);
+        this.addCardToFoundationPile(card, targetFoundationIndex);
         tableauPile.pop();
 
         return true
@@ -176,21 +168,31 @@ export class Solitaire {
         return true;
     }
 
-    private isValidFoundationMove(card: Card) {
-        const foundationPile = this.foundationPiles.find(pile => pile.suit === card.suit);
-        if (!foundationPile) {
+    private isValidFoundationMove(card: Card, targetFoundationIndex: number) {
+        const targetPile = this._foundationPiles[targetFoundationIndex];
+        
+        // If pile is not assigned yet, only accept Aces
+        if (!targetPile.isAssigned) {
+            return card.value === 1;
+        }
+        
+        // If pile is assigned, check if card matches suit and is next in sequence
+        if (targetPile.suit !== card.suit) {
             return false;
         }
-
-        return card.value === foundationPile.value + 1;
+        
+        return card.value === targetPile.value + 1;
     }
 
-    private addCardToFoundationPile(card: Card) {
-        const foundationPile = this.foundationPiles.find(pile => pile.suit === card.suit);
-        if (!foundationPile) {
-            return;
+    private addCardToFoundationPile(card: Card, targetFoundationIndex: number) {
+        const targetPile = this._foundationPiles[targetFoundationIndex];
+        
+        // Assign suit if this is the first card (Ace) for this pile
+        if (!targetPile.isAssigned && card.value === 1) {
+            targetPile.assignSuit(card.suit);
         }
-        foundationPile.addCard();
+        
+        targetPile.addCard();
     }
 
     private isValidTableauMove(card: Card, targetTableauPile: Card[]) {
