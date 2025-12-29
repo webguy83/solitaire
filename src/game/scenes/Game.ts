@@ -117,8 +117,14 @@ export class GameScene extends Phaser.Scene {
     private makeFoundationPiles() {
         FOUNDATION_PILE_X_POSITIONS.forEach(x => {
             this.createLocationBox(x, FOUNDATION_PILE_Y_POSITION);
-            const card = this.createCard(x, FOUNDATION_PILE_Y_POSITION, false).setVisible(false);
+            const card = this.createCard(x, FOUNDATION_PILE_Y_POSITION, true)
+                .setVisible(false)
+                .setData({
+                    pileType: ZONE_TYPE.FOUNDATION,
+                    foundationIndex: this.foundationPileCards.length
+                })
             this.foundationPileCards.push(card);
+            this.input.setDraggable(card);
         });
     }
 
@@ -255,7 +261,7 @@ export class GameScene extends Phaser.Scene {
     private createDropZones() {
         // Create 4 separate foundation zones
         for (let i = 0; i < 4; i++) {
-            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i], FOUNDATION_PILE_Y_POSITION, 65, 85).setOrigin(0).setRectangleDropZone(65, 85).setData({
+            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i], FOUNDATION_PILE_Y_POSITION, 56, 78).setOrigin(0).setRectangleDropZone(56, 78).setDepth(-1).setData({
                 zoneType: ZONE_TYPE.FOUNDATION,
                 pileIndex: i
             });
@@ -418,7 +424,8 @@ export class GameScene extends Phaser.Scene {
             if (pile.value === 0) {
                 return;
             } else {
-                this.foundationPileCards[index].setVisible(true).setFrame(this.getCardFrame(pile));
+                this.foundationPileCards[index].setVisible(true).setFrame(this.getCardFrame(pile))
+                this.input.setDraggable(this.foundationPileCards[index]);
             }
         });
     }
