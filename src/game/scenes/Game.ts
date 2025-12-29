@@ -22,6 +22,9 @@ const STOCK_PILE_X_POSITION = 5;
 const STOCK_PILE_Y_POSITION = 5;
 const TABLEAU_PILE_X_POSITION = 40;
 const TABLEAU_PILE_Y_POSITION = 92;
+const MAX_TABLEAU_HEIGHT = 268; // Maximum available height for tableau piles
+const MAX_CARD_SPACING = 20; // Maximum spacing between cards
+const MIN_CARD_SPACING = 12; // Minimum spacing when compressed
 
 type ZoneType = keyof typeof ZONE_TYPE;
 
@@ -131,6 +134,26 @@ export class GameScene extends Phaser.Scene {
         })
     }
 
+    private calculateCardSpacing(pileSize: number): number {
+        if (pileSize <= 1) return 0;
+        
+        // Calculate the required height for all cards with max spacing
+        const cardHeight = CARD_HEIGHT * SCALE;
+        const requiredHeight = cardHeight + (pileSize - 1) * MAX_CARD_SPACING;
+        
+        // If it fits, use max spacing
+        if (requiredHeight <= MAX_TABLEAU_HEIGHT) {
+            return MAX_CARD_SPACING;
+        }
+        
+        // Otherwise, calculate compressed spacing
+        const availableSpaceForSpacing = MAX_TABLEAU_HEIGHT - cardHeight;
+        const spacing = Math.floor(availableSpaceForSpacing / (pileSize - 1));
+        
+        // Ensure spacing doesn't go below minimum
+        return Math.max(spacing, MIN_CARD_SPACING);
+    }
+
     private makeTableauPiles() {
         this.tableauContainers = [];
 
@@ -138,8 +161,10 @@ export class GameScene extends Phaser.Scene {
             const tableauContainer = this.add.container(TABLEAU_PILE_X_POSITION + pileIndex * 85, TABLEAU_PILE_Y_POSITION, []);
             this.tableauContainers.push(tableauContainer);
 
+            const spacing = this.calculateCardSpacing(pile.length);
+
             pile.forEach((card, cardIndex) => {
-                const cardGameObject = this.createCard(0, cardIndex * 20, card.isFaceUp, cardIndex, pileIndex);
+                const cardGameObject = this.createCard(0, cardIndex * spacing, card.isFaceUp, cardIndex, pileIndex);
                 tableauContainer.add(cardGameObject);
                 if (card.isFaceUp) {
                     cardGameObject.setFrame(this.getCardFrame(card));
@@ -161,9 +186,14 @@ export class GameScene extends Phaser.Scene {
             gameObject.setData({ x: gameObject.x, y: gameObject.y });
             const tableauPileIndex = gameObject.getData('pileIndex') as number | undefined;
             if (tableauPileIndex !== undefined) {
-                this.tableauContainers[tableauPileIndex].setDepth(2);
+                // Set all other tableau containers to base depth
+                this.tableauContainers.forEach((container, index) => {
+                    container.setDepth(index === tableauPileIndex ? 1 : 0);
+                });
             } else {
-                gameObject.setDepth(2);
+                // Dragging from discard pile - reset all tableau containers to base depth
+                this.tableauContainers.forEach(container => container.setDepth(0));
+                gameObject.setDepth(1);
             }
             gameObject.setAlpha(0.8);
         });
@@ -190,10 +220,11 @@ export class GameScene extends Phaser.Scene {
         const cardIndex = gameObject.getData('cardIndex') as number;
         const container = this.tableauContainers[tableauPileIndex];
         const numberOfCardsToMove = container.length - cardIndex;
+        const spacing = this.calculateCardSpacing(container.length);
 
         for (let i = 0; i < numberOfCardsToMove; i++) {
             const cardBelow = container.getAt<Phaser.GameObjects.Image>(cardIndex + i);
-            cardBelow.setPosition(x, y + i * 20);
+            cardBelow.setPosition(x, y + i * spacing);
             cardBelow.setAlpha(alpha);
         }
     }
@@ -202,7 +233,8 @@ export class GameScene extends Phaser.Scene {
         this.input.on(Phaser.Input.Events.DRAG_END, (pointer: Phaser.Input.Pointer, gameObject: Phaser.GameObjects.Image, dropped: boolean) => {
             const tableauPileIndex = gameObject.getData('pileIndex') as number | undefined;
             if (tableauPileIndex !== undefined) {
-                this.tableauContainers[tableauPileIndex].setDepth(0);
+                // Reset all tableau containers to base depth
+                this.tableauContainers.forEach(container => container.setDepth(0));
             } else {
                 gameObject.setDepth(0);
             }
@@ -293,9 +325,12 @@ export class GameScene extends Phaser.Scene {
         }
 
         if (isCardFromDiscardPile) {
-            const newCard = this.createCard(0, originalPileSize * 20, true, originalPileSize, targetTableauIndex);
+            const newPileSize = originalPileSize + 1;
+            const spacing = this.calculateCardSpacing(newPileSize);
+            const newCard = this.createCard(0, originalPileSize * spacing, true, originalPileSize, targetTableauIndex);
             newCard.setFrame(gameObject.frame);
             this.tableauContainers[targetTableauIndex].add(newCard);
+            this.repositionTableauCards(targetTableauIndex);
             this.updateCardGameObjectsInDiscardPile();
             return;
         } else {
@@ -310,11 +345,14 @@ export class GameScene extends Phaser.Scene {
                 const newCardIndex = originalPileSize + i;
                 cardToMove.setData({
                     x: 0,
-                    y: newCardIndex * 20,
+                    y: 0, // Will be repositioned by repositionTableauCards
                     cardIndex: newCardIndex,
                     pileIndex: targetTableauIndex
                 });
             }
+            // Reposition cards in both piles with new spacing
+            this.repositionTableauCards(targetTableauIndex);
+            this.repositionTableauCards(sourceTableauIndex as number);
             // set depths
             this.tableauContainers[sourceTableauIndex as number].setDepth(0);
             this.handleRevealingNewTableauCards(sourceTableauIndex as number);
@@ -348,6 +386,23 @@ export class GameScene extends Phaser.Scene {
         const cardGameObject = this.tableauContainers[sourceTableauIndex].getAt<Phaser.GameObjects.Image>(tableauPile.length - 1);
         cardGameObject.setFrame(this.getCardFrame(card));
         this.input.setDraggable(cardGameObject);
+    }
+
+    private repositionTableauCards(pileIndex: number) {
+        const container = this.tableauContainers[pileIndex];
+        const spacing = this.calculateCardSpacing(container.length);
+        
+        for (let i = 0; i < container.length; i++) {
+            const card = container.getAt<Phaser.GameObjects.Image>(i);
+            const yPos = i * spacing;
+            card.setPosition(0, yPos);
+            card.setData({
+                x: 0,
+                y: yPos,
+                cardIndex: i,
+                pileIndex: pileIndex
+            });
+        }
     }
 
     private updateFoundationPiles() {
