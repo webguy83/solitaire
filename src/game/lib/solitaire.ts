@@ -81,7 +81,7 @@ export class Solitaire {
             return false;
         }
 
-        if (!this.isValidFoundationMove(card, targetFoundationIndex)) {
+        if (!this.isValidTableauToFoundationMove(card, targetFoundationIndex)) {
             return false;
         }
 
@@ -115,7 +115,7 @@ export class Solitaire {
             return false;
         }
 
-        if (!this.isValidFoundationMove(card, targetFoundationIndex)) {
+        if (!this.isValidTableauToFoundationMove(card, targetFoundationIndex)) {
             return false;
         }
 
@@ -128,8 +128,8 @@ export class Solitaire {
 
     moveTableauCardToTableau(sourceTableauIndex: number, cardIndex: number, targetTableauIndex: number) {
         const sourceTableauPile = this._tableauPiles[sourceTableauIndex];
-        const  targetTableauPile = this._tableauPiles[targetTableauIndex];
-        if(sourceTableauPile === undefined || targetTableauPile === undefined) {
+        const targetTableauPile = this._tableauPiles[targetTableauIndex];
+        if (sourceTableauPile === undefined || targetTableauPile === undefined) {
             return false;
         }
 
@@ -138,11 +138,11 @@ export class Solitaire {
             return false;
         }
 
-        if(!card.isFaceUp) {
+        if (!card.isFaceUp) {
             return false;
         }
 
-        if(!this.isValidTableauMove(card, targetTableauPile)) {
+        if (!this.isValidTableauMove(card, targetTableauPile)) {
             return false;
         }
 
@@ -153,6 +153,60 @@ export class Solitaire {
 
     }
 
+    moveFoundationCardToTableau(foundationIndex: number, targetTableauIndex: number) {
+        const foundationPile = this._foundationPiles[foundationIndex];
+        const targetTableauPile = this._tableauPiles[targetTableauIndex];
+
+        // Cannot move from empty foundation pile
+        if (foundationPile.value === 0 || foundationPile.suit === null) {
+            return false;
+        }
+
+        const lastTableauCard = targetTableauPile[targetTableauPile.length - 1];
+
+        if (lastTableauCard.suit === foundationPile.suit) {
+            return false;
+        }
+
+        if (foundationPile.value + 1 !== lastTableauCard.value) {
+            return false;
+        }
+        console.log('Last tableau card:', lastTableauCard);
+
+
+        // Create a card object representing the top card of the foundation pile
+        const card = new Card(foundationPile.suit, foundationPile.value);
+        card.flip();
+
+        // Perform the move
+        targetTableauPile.push(card);
+        foundationPile.removeCard();
+
+        return true;
+    }
+
+    moveFoundationCardToFoundation(sourceFoundationIndex: number, targetFoundationIndex: number) {
+        const sourcePile = this._foundationPiles[sourceFoundationIndex];
+        const targetPile = this._foundationPiles[targetFoundationIndex];
+
+        // Can only move aces (value === 1) to empty foundation piles
+        if (sourcePile.value !== 1 || sourcePile.suit === null) {
+            return false;
+        }
+
+        // Target pile must be empty
+        if (targetPile.value !== 0 || targetPile.suit !== null) {
+            return false;
+        }
+
+        // Perform the move
+        targetPile.assignSuit(sourcePile.suit);
+        targetPile.addCard();
+        sourcePile.removeCard();
+
+        return true;
+    }
+
     flipTableauCard(tableauPileIndex: number) {
         const tableauPile = this._tableauPiles[tableauPileIndex];
         const card = tableauPile[tableauPile.length - 1];
@@ -160,7 +214,7 @@ export class Solitaire {
             return false;
         }
 
-        if(card.isFaceUp) {
+        if (card.isFaceUp) {
             return false;
         }
 
@@ -168,30 +222,30 @@ export class Solitaire {
         return true;
     }
 
-    private isValidFoundationMove(card: Card, targetFoundationIndex: number) {
+    private isValidTableauToFoundationMove(card: Card, targetFoundationIndex: number) {
         const targetPile = this._foundationPiles[targetFoundationIndex];
-        
+
         // If pile is not assigned yet, only accept Aces
         if (!targetPile.isAssigned) {
             return card.value === 1;
         }
-        
+
         // If pile is assigned, check if card matches suit and is next in sequence
         if (targetPile.suit !== card.suit) {
             return false;
         }
-        
+
         return card.value === targetPile.value + 1;
     }
 
     private addCardToFoundationPile(card: Card, targetFoundationIndex: number) {
         const targetPile = this._foundationPiles[targetFoundationIndex];
-        
+
         // Assign suit if this is the first card (Ace) for this pile
         if (!targetPile.isAssigned && card.value === 1) {
             targetPile.assignSuit(card.suit);
         }
-        
+
         targetPile.addCard();
     }
 

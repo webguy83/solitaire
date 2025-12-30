@@ -36,7 +36,7 @@ const ZONE_TYPE = {
 export class GameScene extends Phaser.Scene {
     drawPileCards: Phaser.GameObjects.Image[] = [];
     discardPileCards: Phaser.GameObjects.Image[] = [];
-    foundationPileCards: Phaser.GameObjects.Image[] = [];
+    foundationPileCards: Phaser.GameObjects.Image[][] = [];
     tableauContainers: Phaser.GameObjects.Container[] = [];
 
     private solitaire = new Solitaire();
@@ -54,6 +54,22 @@ export class GameScene extends Phaser.Scene {
         this.makeTableauPiles();
         this.createDragEvents();
         this.createDropZones();
+
+        
+        // Mock data for testing foundation pile cards TODO remove after testing
+        // this.solitaire.foundationPiles[0].assignSuit('HEART');
+        // this.solitaire.foundationPiles[0].addCard(); // Ace
+        //     this.updateFoundationPiles();
+        // // this.solitaire.foundationPiles[0].addCard(); // Two
+        // // this.updateFoundationPiles();
+        // this.solitaire.foundationPiles[1].assignSuit('SPADE');
+        // this.solitaire.foundationPiles[1].addCard(); // Ace
+        // this.updateFoundationPiles();
+        // this.solitaire.foundationPiles[1].addCard(); // Two
+        // this.updateFoundationPiles();
+        // this.solitaire.foundationPiles[1].addCard(); // Three
+        // this.updateFoundationPiles();
+
     }
 
     private makeDrawPile() {
@@ -88,7 +104,7 @@ export class GameScene extends Phaser.Scene {
         });
 
         if (DEBUG) {
-            this.add.rectangle(drawZone.x, drawZone.y, drawZone.width, drawZone.height, 0xff0000, 0.5).setOrigin(0);
+            this.add.rectangle(drawZone.x, drawZone.y, drawZone.width, drawZone.height, 0xff0000, 0.2).setOrigin(0);
         }
     }
 
@@ -115,16 +131,18 @@ export class GameScene extends Phaser.Scene {
     }
 
     private makeFoundationPiles() {
-        FOUNDATION_PILE_X_POSITIONS.forEach(x => {
+        FOUNDATION_PILE_X_POSITIONS.forEach((x, index) => {
             this.createLocationBox(x, FOUNDATION_PILE_Y_POSITION);
-            const card = this.createCard(x, FOUNDATION_PILE_Y_POSITION, true)
-                .setVisible(false)
-                .setData({
+            const bottomCard = this.createCard(x, FOUNDATION_PILE_Y_POSITION, false).setVisible(false).setData({
                     pileType: ZONE_TYPE.FOUNDATION,
-                    foundationIndex: this.foundationPileCards.length
+                    foundationIndex: index
                 })
-            this.foundationPileCards.push(card);
-            this.input.setDraggable(card);
+            const topCard = this.createCard(x, FOUNDATION_PILE_Y_POSITION, true).setVisible(false).setData({
+                    pileType: ZONE_TYPE.FOUNDATION,
+                    foundationIndex: index
+                })
+            this.foundationPileCards.push([bottomCard, topCard]);
+            this.input.setDraggable(topCard);
         });
     }
 
@@ -260,8 +278,14 @@ export class GameScene extends Phaser.Scene {
 
     private createDropZones() {
         // Create 4 separate foundation zones
+     
         for (let i = 0; i < 4; i++) {
-            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i], FOUNDATION_PILE_Y_POSITION, 56, 78).setOrigin(0).setRectangleDropZone(56, 78).setDepth(-1).setData({
+            // add start width using the width of the card instead of padding for the first item
+            // don't add zone padding to the end of the last zone
+            const zonePadding = i === 0 ? 0 : 10;
+            const extraCardWidth = i === 0 ? CARD_WIDTH * SCALE: 0;
+            const extraEndWidth = i === 3 ? zonePadding + 2 : 0; // Extra width for last zone
+            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i] - zonePadding - extraCardWidth, FOUNDATION_PILE_Y_POSITION, 56 + zonePadding + extraEndWidth + extraCardWidth, 78).setOrigin(0).setRectangleDropZone(56 + zonePadding + extraEndWidth + extraCardWidth, 78).setDepth(-1).setData({
                 zoneType: ZONE_TYPE.FOUNDATION,
                 pileIndex: i
             });
@@ -299,12 +323,26 @@ export class GameScene extends Phaser.Scene {
     private handleMoveCardToFoundation(card: Phaser.GameObjects.Image, targetFoundationIndex: number) {
         let isValidMove = false;
         let isCardFomDiscardPile = false;
+        let isCardFromFoundation = false;
 
         const tableauPileIndex = card.getData('pileIndex') as number | undefined;
-        if (tableauPileIndex === undefined) {
+        const cardIndex = card.getData('cardIndex') as number | undefined;
+        const foundationIndex = card.getData('foundationIndex') as number | undefined;
+        
+        if (foundationIndex !== undefined) {
+            // From foundation pile to foundation pile
+            isValidMove = this.solitaire.moveFoundationCardToFoundation(foundationIndex, targetFoundationIndex);
+            isCardFromFoundation = true;
+        } else if (tableauPileIndex === undefined) {
             isValidMove = this.solitaire.playDiscardPileCardToFoundation(targetFoundationIndex);
             isCardFomDiscardPile = true;
         } else {
+            // Only allow moving the top card from tableau to foundation (no stacks)
+            const tableauPile = this.tableauContainers[tableauPileIndex];
+            if (cardIndex !== tableauPile.length - 1) {
+                // Not the top card - multiple cards being dragged, which is invalid
+                return;
+            }
             isValidMove = this.solitaire.moveTableauCardToFoundation(tableauPileIndex, targetFoundationIndex);
         }
         if (!isValidMove) {
@@ -313,6 +351,8 @@ export class GameScene extends Phaser.Scene {
 
         if (isCardFomDiscardPile) {
             this.updateCardGameObjectsInDiscardPile();
+        } else if (isCardFromFoundation) {
+            this.updateFoundationPiles();
         } else {
             this.handleRevealingNewTableauCards(tableauPileIndex as number);
             card.destroy();
@@ -322,30 +362,43 @@ export class GameScene extends Phaser.Scene {
     private handleMoveCardToTableau(gameObject: Phaser.GameObjects.Image, targetTableauIndex: number) {
         let isValidMove = false;
         let isCardFromDiscardPile = false;
+        let isCardFromFoundation = false;
 
         const sourceTableauIndex = gameObject.getData('pileIndex') as number | undefined;
+        const foundationIndex = gameObject.getData('foundationIndex') as number | undefined;
         const cardIndex = gameObject.getData('cardIndex') as number;
 
         const originalPileSize = this.tableauContainers[targetTableauIndex].length;
 
-        if (sourceTableauIndex === undefined) {
+        if (foundationIndex !== undefined) {
+            // From foundation pile
+            isValidMove = this.solitaire.moveFoundationCardToTableau(foundationIndex, targetTableauIndex);
+            isCardFromFoundation = true;
+        } else if (sourceTableauIndex === undefined) {
+            // From discard pile
             isValidMove = this.solitaire.playDiscardPileCardToTableau(targetTableauIndex);
             isCardFromDiscardPile = true;
         } else {
+            // From tableau to tableau
             isValidMove = this.solitaire.moveTableauCardToTableau(sourceTableauIndex, cardIndex, targetTableauIndex);
         }
         if (!isValidMove) {
             return;
         }
 
-        if (isCardFromDiscardPile) {
+        if (isCardFromDiscardPile || isCardFromFoundation) {
             const newPileSize = originalPileSize + 1;
             const spacing = this.calculateCardSpacing(newPileSize);
             const newCard = this.createCard(0, originalPileSize * spacing, true, originalPileSize, targetTableauIndex);
             newCard.setFrame(gameObject.frame);
             this.tableauContainers[targetTableauIndex].add(newCard);
             this.repositionTableauCards(targetTableauIndex);
-            this.updateCardGameObjectsInDiscardPile();
+            
+            if (isCardFromDiscardPile) {
+                this.updateCardGameObjectsInDiscardPile();
+            } else if (isCardFromFoundation) {
+                this.updateFoundationPiles();
+            }
             return;
         } else {
             // from tableau to tableau
@@ -421,11 +474,26 @@ export class GameScene extends Phaser.Scene {
 
     private updateFoundationPiles() {
         this.solitaire.foundationPiles.forEach((pile, index) => {
-            if (pile.value === 0) {
+            const [bottomCard, topCard] = this.foundationPileCards[index];
+            
+            if (pile.suit === null || pile.value === 0) {
+                bottomCard.setVisible(false);
+                topCard.setVisible(false);
                 return;
+            }
+            
+            if (pile.value === 1) {
+                // Only one card, show only top card
+                bottomCard.setVisible(false);
+                topCard.setVisible(true).setFrame(this.getCardFrame(pile));
+                this.input.setDraggable(topCard);
             } else {
-                this.foundationPileCards[index].setVisible(true).setFrame(this.getCardFrame(pile))
-                this.input.setDraggable(this.foundationPileCards[index]);
+                // Two or more cards, show both bottom and top
+                // Bottom card shows the previous card (value - 1)
+                const previousCardFrame = SUIT_FRAMES[pile.suit] + (pile.value - 2);
+                bottomCard.setVisible(true).setFrame(previousCardFrame);
+                topCard.setVisible(true).setFrame(this.getCardFrame(pile));
+                this.input.setDraggable(topCard);
             }
         });
     }

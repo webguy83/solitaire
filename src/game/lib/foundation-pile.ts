@@ -37,4 +37,13 @@ export class FoundationPile {
             this._currentValue += 1;
         }
     }
+
+    removeCard() {
+        if (this._currentValue > 0) {
+            this._currentValue -= 1;
+            if (this._currentValue === 0) {
+                this._suit = null;
+            }
+        }
+    }
 }
