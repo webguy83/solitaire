@@ -1,6 +1,19 @@
-import { SCENE_KEYS, ASSET_KEYS } from "./common";
+import { SCENE_KEYS } from "./common";
 
 export class TitleScene extends Phaser.Scene {
+    private static readonly COLORS = {
+        FELT_GREEN: 0x0B7D3E,
+        FELT_DARK: 0x085A2C,
+        BUTTON_GREEN: 0x0A6B34,
+        BUTTON_HOVER: 0x0D9245,
+        WHITE: 0xFFFFFF,
+        CREAM: 0xFFF8DC,
+        DARK_STROKE: 0x043D1A,
+        SUIT_RED: 0xDC143C,
+        SUIT_RED_DARK: 0xA01020,
+        SUIT_BLACK: 0x000000
+    } as const;
+
     constructor() {
         super({ key: SCENE_KEYS.TITLE });
     }
@@ -10,141 +23,177 @@ export class TitleScene extends Phaser.Scene {
         const centerX = width / 2;
         const centerY = height / 2;
 
-        // Luxurious purple and gold gradient background
-        const bgTop = this.add.rectangle(0, 0, width, height / 2, 0x2d1b4e, 1);
-        bgTop.setOrigin(0, 0);
+        this.createBackground(width, height);
+        this.createDecorations(width, height);
+        this.createTitle(centerX, centerY);
+        this.createSubtitle(centerX, centerY);
+        this.createPlayButton(centerX, centerY);
+        this.createFooter(centerX, height);
+    }
+
+    private createBackground(width: number, height: number): void {
+        // Classic felt green background
+        this.add.rectangle(0, 0, width, height, TitleScene.COLORS.FELT_GREEN, 1).setOrigin(0, 0);
         
-        const bgBottom = this.add.rectangle(0, height / 2, width, height / 2, 0x1a0f35, 1);
-        bgBottom.setOrigin(0, 0);
+        // Subtle darker border for depth
+        const borderSize = 8;
+        this.add.rectangle(0, 0, width, borderSize, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(0, height - borderSize, width, borderSize, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(0, 0, borderSize, height, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(width - borderSize, 0, borderSize, height, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
+    }
 
-        // Gold accent strips
-        const goldTop = this.add.rectangle(0, 0, width, 5, 0xd4af37, 1);
-        goldTop.setOrigin(0, 0);
-        
-        const goldBottom = this.add.rectangle(0, height - 5, width, 5, 0xd4af37, 1);
-        goldBottom.setOrigin(0, 0);
+    private createDecorations(width: number, height: number): void {
+        // Black suits
+        this.createSuitDecoration(60, 50, '♠', TitleScene.COLORS.SUIT_BLACK);
+        this.createSuitDecoration(width - 60, height - 50, '♣', TitleScene.COLORS.SUIT_BLACK);
+        // Red suits
+        this.createSuitDecoration(width - 60, 50, '♥', TitleScene.COLORS.SUIT_RED);
+        this.createSuitDecoration(60, height - 50, '♦', TitleScene.COLORS.SUIT_RED);
+    }
 
-        // Ornate decorative elements (top corners)
-        this.createSuitDecoration(50, 40, '♠', 0xd4af37);
-        this.createSuitDecoration(width - 50, 40, '♥', 0xffd700);
-
-        // Ornate main title with gold styling
-        const titleText = this.add.text(centerX, centerY - 60, 'SOLITAIRE', {
+    private createTitle(centerX: number, centerY: number): void {
+        const titleText = this.add.text(centerX, centerY - 80, 'SOLITAIRE', {
             fontFamily: 'Georgia, serif',
-            fontSize: '80px',
-            color: '#ffd700',
-            stroke: '#8b6914',
-            strokeThickness: 6,
+            fontSize: '90px',
+            color: '#FFFFFF',
+            stroke: `#${TitleScene.COLORS.DARK_STROKE.toString(16)}`,
+            strokeThickness: 5,
             shadow: {
-                offsetX: 4,
-                offsetY: 4,
+                offsetX: 3,
+                offsetY: 3,
                 color: '#000000',
-                blur: 12,
+                blur: 8,
                 fill: true
             }
+        }).setOrigin(0.5);
+
+        this.createShimmerEffect(titleText);
+    }
+
+    private createSubtitle(centerX: number, centerY: number): void {
+        this.add.text(centerX, centerY, '✦ Classic Card Game ✦', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '24px',
+            color: `#${TitleScene.COLORS.CREAM.toString(16)}`,
+            fontStyle: 'italic',
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000000',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5);
+    }
+
+    private createPlayButton(centerX: number, centerY: number): void {
+        const buttonY = centerY + 90;
+        const buttonBg = this.add.rectangle(centerX, buttonY, 220, 60, TitleScene.COLORS.SUIT_RED, 1);
+        buttonBg.setStrokeStyle(4, TitleScene.COLORS.WHITE, 1);
+        buttonBg.setInteractive({ useHandCursor: true });
+
+        const buttonText = this.add.text(centerX, buttonY, 'PLAY', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '36px',
+            color: '#FFFFFF',
+            fontStyle: 'bold',
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000000',
+                blur: 4,
+                fill: true
+            }
+        }).setOrigin(0.5);
+
+        this.setupButtonInteractions(buttonBg);
+        this.createButtonPulseEffect(buttonBg, buttonText);
+    }
+
+    private createFooter(centerX: number, height: number): void {
+        const footerText = this.add.text(
+            centerX,
+            height - 25,
+            `© ${new Date().getFullYear()} - Press PLAY to Start`,
+            {
+                fontFamily: 'Georgia, serif',
+                fontSize: '16px',
+                color: `#${TitleScene.COLORS.CREAM.toString(16)}`,
+                shadow: {
+                    offsetX: 1,
+                    offsetY: 1,
+                    color: '#000000',
+                    blur: 3,
+                    fill: true
+                }
+            }
+        );
+        footerText.setOrigin(0.5).setAlpha(0.8);
+    }
+
+    private setupButtonInteractions(buttonBg: Phaser.GameObjects.Rectangle): void {
+        buttonBg.once(Phaser.Input.Events.POINTER_DOWN, () => {
+            this.cameras.main.fadeOut(500, 0, 0, 0, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+                if(progress === 1) {
+                    this.scene.start(SCENE_KEYS.GAME);
+                }
+            });
         });
-        titleText.setOrigin(0.5);
-        
-        // Add golden shimmer effect
+
+        this.input.on(Phaser.Input.Events.POINTER_OVER, () => {
+            buttonBg.setStrokeStyle(4, TitleScene.COLORS.CREAM, 1);
+            this.tweens.addCounter({
+                from: 0,
+                to: 1,
+                duration: 200,
+                ease: 'Power2',
+                onUpdate: (tween) => {
+                    const value = tween.getValue() ?? 0;
+                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED),
+                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED_DARK),
+                        1,
+                        value
+                    );
+                    buttonBg.setFillStyle(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                }
+            });
+        });
+
+        this.input.on(Phaser.Input.Events.POINTER_OUT, () => {
+            buttonBg.setStrokeStyle(4, TitleScene.COLORS.WHITE, 1);
+            this.tweens.addCounter({
+                from: 0,
+                to: 1,
+                duration: 200,
+                ease: 'Power2',
+                onUpdate: (tween) => {
+                    const value = tween.getValue() ?? 0;
+                    const color = Phaser.Display.Color.Interpolate.ColorWithColor(
+                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED_DARK),
+                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED),
+                        1,
+                        value
+                    );
+                    buttonBg.setFillStyle(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
+                }
+            });
+        });
+    }
+
+    private createShimmerEffect(target: Phaser.GameObjects.Text): void {
         this.tweens.add({
-            targets: titleText,
-            alpha: { from: 0.95, to: 1 },
+            targets: target,
+            alpha: { from: 0.8, to: 1 },
             duration: 1000,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
+    }
 
-        // Elegant subtitle
-        const subtitleText = this.add.text(centerX, centerY + 10, '✦ Classic Card Game ✦', {
-            fontFamily: 'Georgia, serif',
-            fontSize: '22px',
-            color: '#d4af37',
-            fontStyle: 'italic'
-        });
-        subtitleText.setOrigin(0.5);
-
-        // Play button container
-        const buttonY = centerY + 80;
-        const buttonWidth = 200;
-        const buttonHeight = 50;
-
-        // Ornate button background
-        const buttonBg = this.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, 0x4a2c7a, 1);
-        buttonBg.setStrokeStyle(3, 0xd4af37, 1);
-        buttonBg.setInteractive({ useHandCursor: true });
-
-        // Button text with gold styling
-        const buttonText = this.add.text(centerX, buttonY, 'PLAY', {
-            fontFamily: 'Georgia, serif',
-            fontSize: '32px',
-            color: '#ffd700',
-            fontStyle: 'bold'
-        });
-        buttonText.setOrigin(0.5);
-
-        // Luxurious button hover effects
-        buttonBg.on('pointerover', () => {
-            buttonBg.setFillStyle(0x6a3ca8);
-            buttonBg.setStrokeStyle(3, 0xffd700, 1);
-            this.tweens.add({
-                targets: [buttonBg, buttonText],
-                scale: 1.05,
-                duration: 200,
-                ease: 'Power2'
-            });
-        });
-
-        buttonBg.on('pointerout', () => {
-            buttonBg.setFillStyle(0x4a2c7a);
-            buttonBg.setStrokeStyle(3, 0xd4af37, 1);
-            this.tweens.add({
-                targets: [buttonBg, buttonText],
-                scale: 1,
-                duration: 200,
-                ease: 'Power2'
-            });
-        });
-
-        buttonBg.on('pointerdown', () => {
-            buttonBg.setFillStyle(0x3a1f5a);
-            this.tweens.add({
-                targets: [buttonBg, buttonText],
-                scale: 0.98,
-                duration: 100,
-                ease: 'Power2'
-            });
-        });
-
-        buttonBg.on('pointerup', () => {
-            buttonBg.setFillStyle(0x6a3ca8);
-            this.tweens.add({
-                targets: [buttonBg, buttonText],
-                scale: 1.05,
-                duration: 100,
-                ease: 'Power2'
-            });
-            
-            // Start the game
-            this.scene.start(SCENE_KEYS.GAME);
-        });
-
-        
-
-        // Ornate decorative elements (bottom corners)
-        this.createSuitDecoration(50, height - 40, '♦', 0xffd700);
-        this.createSuitDecoration(width - 50, height - 40, '♣', 0xd4af37);
-
-        // Elegant footer text
-        const footerText = this.add.text(centerX, height - 20, `© ${new Date().getFullYear()} - Press PLAY to Start`, {
-            fontFamily: 'Georgia, serif',
-            fontSize: '14px',
-            color: '#d4af37'
-        });
-        footerText.setOrigin(0.5);
-        footerText.setAlpha(0.7);
-
-        // Add subtle pulsing animation to the play button
+    private createButtonPulseEffect(buttonBg: Phaser.GameObjects.Rectangle, buttonText: Phaser.GameObjects.Text): void {
         this.tweens.add({
             targets: [buttonBg, buttonText],
             alpha: { from: 1, to: 0.85 },
@@ -158,28 +207,20 @@ export class TitleScene extends Phaser.Scene {
     private createSuitDecoration(x: number, y: number, symbol: string, color: number) {
         const suit = this.add.text(x, y, symbol, {
             fontFamily: 'Arial, sans-serif',
-            fontSize: '50px',
+            fontSize: '70px',
             color: `#${color.toString(16).padStart(6, '0')}`,
-            stroke: '#8b6914',
-            strokeThickness: 2
+            stroke: color === TitleScene.COLORS.SUIT_BLACK ? '#666666' : '#8B0000',
+            strokeThickness: 3
         });
         suit.setOrigin(0.5);
-        suit.setAlpha(0.5);
+        suit.setAlpha(0.6);
 
-        // Add gentle rotation and shimmer animation
+        // Subtle float animation
         this.tweens.add({
             targets: suit,
-            angle: { from: -10, to: 10 },
-            duration: 3000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-        
-        this.tweens.add({
-            targets: suit,
-            alpha: { from: 0.4, to: 0.6 },
-            duration: 2000,
+            y: suit.y + 10,
+            alpha: { from: 0.5, to: 0.7 },
+            duration: 2500,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'

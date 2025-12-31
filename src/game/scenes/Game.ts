@@ -46,6 +46,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(500, 0, 0, 0);
         this.solitaire.newGame();
 
         this.makeDrawPile();
