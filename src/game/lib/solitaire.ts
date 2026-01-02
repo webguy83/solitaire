@@ -164,15 +164,21 @@ export class Solitaire {
 
         const lastTableauCard = targetTableauPile[targetTableauPile.length - 1];
 
-        if (lastTableauCard.suit === foundationPile.suit) {
-            return false;
-        }
+        // If tableau pile is empty, only King (value 13) can be placed
+        if (!lastTableauCard) {
+            if (foundationPile.value !== 13) {
+                return false;
+            }
+        } else {
+            // Tableau pile is not empty - check valid move
+            if (lastTableauCard.suit === foundationPile.suit) {
+                return false;
+            }
 
-        if (foundationPile.value + 1 !== lastTableauCard.value) {
-            return false;
+            if (foundationPile.value + 1 !== lastTableauCard.value) {
+                return false;
+            }
         }
-        console.log('Last tableau card:', lastTableauCard);
-
 
         // Create a card object representing the top card of the foundation pile
         const card = new Card(foundationPile.suit, foundationPile.value);

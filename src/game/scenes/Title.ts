@@ -34,7 +34,7 @@ export class TitleScene extends Phaser.Scene {
     private createBackground(width: number, height: number): void {
         // Classic felt green background
         this.add.rectangle(0, 0, width, height, TitleScene.COLORS.FELT_GREEN, 1).setOrigin(0, 0);
-        
+
         // Subtle darker border for depth
         const borderSize = 8;
         this.add.rectangle(0, 0, width, borderSize, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
@@ -135,7 +135,7 @@ export class TitleScene extends Phaser.Scene {
     private setupButtonInteractions(buttonBg: Phaser.GameObjects.Rectangle): void {
         buttonBg.once(Phaser.Input.Events.POINTER_DOWN, () => {
             this.cameras.main.fadeOut(500, 0, 0, 0, (_camera: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-                if(progress === 1) {
+                if (progress === 1) {
                     this.scene.start(SCENE_KEYS.GAME);
                 }
             });
