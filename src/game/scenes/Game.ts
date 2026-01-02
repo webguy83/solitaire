@@ -148,8 +148,8 @@ export class GameScene extends Phaser.Scene {
 
         if (draggable) {
             card.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
-                // If the card was moved less than 1 pixel, treat it as a click
-                if (pointer.getDistance() < 2) {
+                // If the card was moved less than 5 pixels, treat it as a click
+                if (pointer.getDistance() < 5) {
                     this.handleCardClick(card);
                 }
             });
@@ -428,7 +428,7 @@ export class GameScene extends Phaser.Scene {
 
         cardGameObject.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
             // If the card was moved less than 1 pixel, treat it as a click
-            if (pointer.getDistance() < 2) {
+            if (pointer.getDistance() < 5) {
                 this.handleCardClick(cardGameObject);
             }
         });
@@ -463,7 +463,7 @@ export class GameScene extends Phaser.Scene {
             }
 
             // not valid move then check tableau to tableau
-            if(!isValidMove && cardIndex !== undefined) {
+            if (!isValidMove && cardIndex !== undefined) {
                 for (let i = 0; i < this.solitaire.tableauPiles.length; i++) {
                     isValidMove = this.solitaire.moveTableauCardToTableau(tableauPileIndex, cardIndex, i);
 
@@ -497,6 +497,11 @@ export class GameScene extends Phaser.Scene {
                 }
             }
         }
+
+        // No valid move found - shake the card
+        if (!isValidMove) {
+            this.shakeCard(card);
+        }
     }
 
     private handleTableauToTableauGameObjects(sourceTableauIndex: number, cardIndex: number, targetTableauIndex: number, originalPileSize: number) {
@@ -529,6 +534,94 @@ export class GameScene extends Phaser.Scene {
         newCard.setFrame(frame);
         this.tableauContainers[targetTableauIndex].add(newCard);
         this.repositionTableauCards(targetTableauIndex);
+    }
+
+    private shakeCard(gameObject: Phaser.GameObjects.Image) {
+        gameObject.disableInteractive();
+        
+        // If card is in a tableau pile, disable cards below it and shake cards on top of it
+        const tableauPileIndex = gameObject.getData('pileIndex') as number | undefined;
+        const cardIndex = gameObject.getData('cardIndex') as number | undefined;
+        const cardsToReEnable: Phaser.GameObjects.Image[] = [];
+        const cardsToShake: Array<{ card: Phaser.GameObjects.Image, originalOriginX: number, originalOriginY: number, originalX: number, originalY: number }> = [];
+        
+        if (tableauPileIndex !== undefined && cardIndex !== undefined) {
+            const container = this.tableauContainers[tableauPileIndex];
+            
+            // Disable all cards below the shaken card
+            for (let i = 0; i < cardIndex; i++) {
+                const cardBelow = container.getAt<Phaser.GameObjects.Image>(i);
+                if (cardBelow.input?.enabled) {
+                    cardBelow.disableInteractive();
+                    cardsToReEnable.push(cardBelow);
+                }
+            }
+            
+            // Prepare all cards from clicked card to top of pile for shaking
+            for (let i = cardIndex; i < container.length; i++) {
+                const card = container.getAt<Phaser.GameObjects.Image>(i);
+                card.disableInteractive();
+                
+                const originalOriginX = card.originX;
+                const originalOriginY = card.originY;
+                const originalX = card.x;
+                const originalY = card.y;
+                
+                // Adjust position when changing origin to keep card in same visual position
+                const offsetX = (0.5 - originalOriginX) * card.displayWidth;
+                const offsetY = (0.5 - originalOriginY) * card.displayHeight;
+                card.setOrigin(0.5, 0.5);
+                card.setPosition(originalX + offsetX, originalY + offsetY);
+                
+                cardsToShake.push({ card, originalOriginX, originalOriginY, originalX, originalY });
+            }
+        } else {
+            // Not in tableau pile - handle single card (discard pile or foundation)
+            const originalOriginX = gameObject.originX;
+            const originalOriginY = gameObject.originY;
+            const originalX = gameObject.x;
+            const originalY = gameObject.y;
+            
+            const offsetX = (0.5 - originalOriginX) * gameObject.displayWidth;
+            const offsetY = (0.5 - originalOriginY) * gameObject.displayHeight;
+            gameObject.setOrigin(0.5, 0.5);
+            gameObject.setPosition(originalX + offsetX, originalY + offsetY);
+            
+            cardsToShake.push({ card: gameObject, originalOriginX, originalOriginY, originalX, originalY });
+            
+            // If this is a discard pile card, also disable the other discard pile card
+            if (this.discardPileCards.includes(gameObject)) {
+                this.discardPileCards.forEach(discardCard => {
+                    if (discardCard !== gameObject && discardCard.input?.enabled) {
+                        discardCard.disableInteractive();
+                        cardsToReEnable.push(discardCard);
+                    }
+                });
+            }
+        }
+
+        this.tweens.add({
+            targets: cardsToShake.map(c => c.card),
+            rotation: { from: -0.04, to: 0.04 },
+            duration: 60,
+            yoyo: true,
+            repeat: 2,
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+                // Restore all shaken cards
+                cardsToShake.forEach(({ card, originalOriginX, originalOriginY, originalX, originalY }) => {
+                    card.setRotation(0);
+                    card.setOrigin(originalOriginX, originalOriginY);
+                    card.setPosition(originalX, originalY);
+                    card.setInteractive({ draggable: true });
+                });
+                
+                // Re-enable cards that were disabled below the shake
+                cardsToReEnable.forEach(card => {
+                    card.setInteractive({ draggable: true });
+                });
+            }
+        });
     }
 
     private repositionTableauCards(pileIndex: number) {

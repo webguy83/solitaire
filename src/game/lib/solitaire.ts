@@ -1,4 +1,5 @@
 import { Card } from "./card";
+import { CARD_SUIT_TO_COLOUR } from "./common";
 import { Deck } from "./deck";
 import { FoundationPile } from "./foundation-pile";
 
@@ -171,7 +172,8 @@ export class Solitaire {
             }
         } else {
             // Tableau pile is not empty - check valid move
-            if (lastTableauCard.suit === foundationPile.suit) {
+            const foundationCardColor = CARD_SUIT_TO_COLOUR[foundationPile.suit];
+            if (lastTableauCard.colour === foundationCardColor) {
                 return false;
             }
 
