@@ -5,6 +5,7 @@ import { Card } from '../lib/card';
 import { CardValue } from '../lib/common';
 import { FoundationPile } from '../lib/foundation-pile';
 import { WinPopup } from './WinPopup';
+import { BottomBar } from './BottomBar';
 
 const DEBUG = false;
 const FOUNDATION_START_X = 345;
@@ -42,16 +43,8 @@ export class GameScene extends Phaser.Scene {
     private maxTableauHeight: number = 0;
 
     private solitaire = new Solitaire();
-    private timerText!: Phaser.GameObjects.Text;
-    private movesText!: Phaser.GameObjects.Text;
-    private stockText!: Phaser.GameObjects.Text;
-    private bottomBarBg!: Phaser.GameObjects.Rectangle;
-    private restartButton!: Phaser.GameObjects.Rectangle;
-    private restartButtonText!: Phaser.GameObjects.Text;
-    private elapsedSeconds = 0;
-    private timerEvent?: Phaser.Time.TimerEvent;
+    private bottomBar!: BottomBar;
     private gameCompleted = false;
-    private moveCount = 0;
 
     constructor() {
         super({ key: SCENE_KEYS.GAME });
@@ -70,9 +63,7 @@ export class GameScene extends Phaser.Scene {
         // Reset game state
         this.solitaire = new Solitaire();
         this.solitaire.newGame();
-        this.elapsedSeconds = 0;
         this.gameCompleted = false;
-        this.moveCount = 0;
 
         // Calculate maximum tableau height based on screen dimensions
         const { height } = this.scale;
@@ -85,7 +76,7 @@ export class GameScene extends Phaser.Scene {
         this.makeTableauPiles();
         this.createDragEvents();
         this.createDropZones();
-        this.createBottomBar();
+        this.bottomBar = new BottomBar(this, () => this.scene.restart());
         this.setupDebugKeys();
 
     }
@@ -149,98 +140,7 @@ export class GameScene extends Phaser.Scene {
         });
     }
 
-    private createBottomBar() {
-        const { width, height } = this.scale;
-        const barHeight = 22;
-        const barY = height - barHeight / 2;
 
-        // Retro green background bar
-        this.bottomBarBg = this.add.rectangle(0, height - barHeight, width, barHeight, COLORS.FELT_DARK)
-            .setOrigin(0, 0)
-            .setDepth(1);
-
-        const textStyle = {
-            fontFamily: 'Courier New, monospace',
-            fontSize: '16px',
-            color: '#FFFFFF',
-            fontStyle: 'bold'
-        };
-
-        // Moves counter on the left
-        this.movesText = this.add.text(10, barY, 'Moves: 0', textStyle)
-            .setOrigin(0, 0.5)
-            .setDepth(1);
-
-        // Timer on the right side
-        this.timerText = this.add.text(width - 10, barY, 'Time: 0', textStyle)
-            .setOrigin(1, 0.5)
-            .setDepth(1);
-
-        // Restart button in the center
-        const buttonWidth = 90;
-        const buttonHeight = 18;
-        const centerX = width / 2;
-
-        this.restartButton = this.add.rectangle(centerX, barY, buttonWidth, buttonHeight, COLORS.SUIT_RED)
-            .setStrokeStyle(1, COLORS.WHITE)
-            .setInteractive({ useHandCursor: true })
-            .setDepth(1);
-
-        this.restartButtonText = this.add.text(centerX, barY, 'New Game', {
-            fontFamily: 'Courier New, monospace',
-            fontSize: '14px',
-            color: `#${COLORS.WHITE.toString(16).padStart(6, '0')}`,
-        }).setOrigin(0.5).setDepth(1);
-
-        // Button hover effects
-        this.restartButton.on('pointerover', () => {
-            this.restartButton.setFillStyle(COLORS.SUIT_RED_DARK);
-        });
-
-        this.restartButton.on('pointerout', () => {
-            this.restartButton.setFillStyle(COLORS.SUIT_RED);
-        });
-
-        // Button click handler
-        this.restartButton.on('pointerdown', () => {
-            this.scene.restart();
-        });
-
-        // Stock pile count (hidden by default for retro look)
-        this.stockText = this.add.text(-1000, -1000, '', textStyle)
-            .setDepth(101);
-
-        this.timerEvent = this.time.addEvent({
-            delay: 1000,
-            callback: this.updateTimer,
-            callbackScope: this,
-            loop: true
-        });
-
-        this.updateStockDisplay();
-    }
-
-    private updateTimer() {
-        if (this.gameCompleted) {
-            return;
-        }
-
-        this.elapsedSeconds++;
-        const minutes = Math.floor(this.elapsedSeconds / 60);
-        const seconds = this.elapsedSeconds % 60;
-        const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        this.timerText.setText(`Time: ${formattedTime}`);
-    }
-
-    private incrementMoveCount() {
-        this.moveCount++;
-        this.movesText.setText(`Moves: ${this.moveCount}`);
-    }
-
-    private updateStockDisplay() {
-        const stockCount = this.solitaire.drawPile.length;
-        this.stockText.setText(`${stockCount} Stock`);
-    }
 
     private makeDrawPile() {
         this.createLocationBox(STOCK_PILE_X_POSITION, STOCK_PILE_Y_POSITION);
@@ -275,7 +175,6 @@ export class GameScene extends Phaser.Scene {
 
             this.solitaire.drawCard();
             this.showCardsInDrawPile();
-            this.updateStockDisplay();
 
             this.discardPileCards[0].setFrame(this.discardPileCards[1].frame).setVisible(this.discardPileCards[1].visible);
             const card = this.solitaire.discardPile[this.solitaire.discardPile.length - 1];
@@ -568,7 +467,7 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        this.incrementMoveCount();
+        this.bottomBar.incrementMoveCount();
 
         if (isCardFomDiscardPile) {
             this.updateCardGameObjectsInDiscardPile();
@@ -607,7 +506,7 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        this.incrementMoveCount();
+        this.bottomBar.incrementMoveCount();
 
         if (isCardFromDiscardPile || isCardFromFoundation) {
             this.addCardToTableauPile(originalPileSize, gameObject.frame, targetTableauIndex);
@@ -681,7 +580,7 @@ export class GameScene extends Phaser.Scene {
                     isValidMove = this.solitaire.moveTableauCardToFoundation(tableauPileIndex, i);
 
                     if (isValidMove) {
-                        this.incrementMoveCount();
+                        this.bottomBar.incrementMoveCount();
                         this.handleRevealingNewTableauCards(tableauPileIndex as number);
                         card.destroy();
                         this.updateFoundationPiles();
@@ -696,7 +595,7 @@ export class GameScene extends Phaser.Scene {
                     isValidMove = this.solitaire.moveTableauCardToTableau(tableauPileIndex, cardIndex, i);
 
                     if (isValidMove) {
-                        this.incrementMoveCount();
+                        this.bottomBar.incrementMoveCount();
                         this.handleTableauToTableauGameObjects(tableauPileIndex, cardIndex, i, this.tableauContainers[i].length);
                         return;
                     }
@@ -717,7 +616,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < this.solitaire.foundationPiles.length; i++) {
             isValidMove = this.solitaire.playDiscardPileCardToFoundation(i);
             if (isValidMove) {
-                this.incrementMoveCount();
+                this.bottomBar.incrementMoveCount();
                 this.updateCardGameObjectsInDiscardPile();
                 this.updateFoundationPiles();
                 return;
@@ -728,7 +627,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < this.solitaire.tableauPiles.length; i++) {
             isValidMove = this.solitaire.playDiscardPileCardToTableau(i);
             if (isValidMove) {
-                this.incrementMoveCount();
+                this.bottomBar.incrementMoveCount();
                 this.addCardToTableauPile(this.tableauContainers[i].length, card.frame, i);
                 this.updateCardGameObjectsInDiscardPile();
                 return;
@@ -897,28 +796,17 @@ export class GameScene extends Phaser.Scene {
 
     private handleGameWon() {
         this.gameCompleted = true;
-
-        if (this.timerEvent) {
-            this.timerEvent.destroy();
-        }
-
-        // Hide the bottom bar
-        this.bottomBarBg.setVisible(false);
-        this.movesText.setVisible(false);
-        this.timerText.setVisible(false);
-        this.restartButton.setVisible(false);
-        this.restartButtonText.setVisible(false);
-        
+        this.bottomBar.setGameCompleted(true);
 
         // Start the cascading card animation
         this.startWinAnimation();
 
         // Show win popup with stats after a short delay
         this.time.delayedCall(800, () => {
-            const minutes = Math.floor(this.elapsedSeconds / 60);
-            const seconds = this.elapsedSeconds % 60;
+            const minutes = Math.floor(this.bottomBar.getElapsedSeconds() / 60);
+            const seconds = this.bottomBar.getElapsedSeconds() % 60;
             const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            new WinPopup(this, this.moveCount, formattedTime);
+            new WinPopup(this, this.bottomBar.getMoveCount(), formattedTime);
         });
     }
 
