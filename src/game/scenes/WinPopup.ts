@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { ASSET_KEYS, SCALE, SUIT_FRAMES } from './common';
+import { ASSET_KEYS, SCALE, SUIT_FRAMES, COLORS } from './common';
 
 export class WinPopup {
     private scene: Phaser.Scene;
@@ -25,37 +25,51 @@ export class WinPopup {
         // Main popup box background
         const boxWidth = 420;
         const boxHeight = 260;
-        const popupBox = this.scene.add.rectangle(centerX, centerY, boxWidth, boxHeight, 0x387F3C)
-            .setStrokeStyle(4, 0x2a5f2e);
+        const popupBox = this.scene.add.rectangle(centerX, centerY, boxWidth, boxHeight, COLORS.WIN_POPUP_BG)
+            .setStrokeStyle(4, COLORS.WIN_POPUP_BORDER);
         container.add(popupBox);
 
         // Inner border for depth
-        const innerBox = this.scene.add.rectangle(centerX, centerY, boxWidth - 16, boxHeight - 16, 0x387F3C)
-            .setStrokeStyle(2, 0x4a9f4e);
+        const innerBox = this.scene.add.rectangle(centerX, centerY, boxWidth - 16, boxHeight - 16, COLORS.WIN_POPUP_BG)
+            .setStrokeStyle(2, COLORS.WIN_POPUP_INNER_BORDER);
         container.add(innerBox);
+
+        // Display the four aces at top
+        const aceY = centerY - 75;
+        const aceSpacing = 55;
+        const startX = centerX - (aceSpacing * 1.5);
+
+        const suits: Array<keyof typeof SUIT_FRAMES> = ['HEART', 'DIAMOND', 'CLUB', 'SPADE'];
+        suits.forEach((suit, index) => {
+            const aceCard = this.scene.add.image(startX + index * aceSpacing, aceY, ASSET_KEYS.CARDS)
+                .setOrigin(0.5)
+                .setScale(SCALE)
+                .setFrame(SUIT_FRAMES[suit]);
+            container.add(aceCard);
+        });
 
         // Blue ribbon banner background
         const bannerWidth = 360;
         const bannerHeight = 50;
-        const bannerY = centerY - 30;
-        
+        const bannerY = centerY - 5;
+
         // Banner shadow
-        const bannerShadow = this.scene.add.rectangle(centerX + 2, bannerY + 2, bannerWidth, bannerHeight, 0x1a3a6e)
+        const bannerShadow = this.scene.add.rectangle(centerX + 2, bannerY + 2, bannerWidth, bannerHeight, COLORS.WIN_BANNER_DARK)
             .setOrigin(0.5);
         container.add(bannerShadow);
-        
+
         // Banner main
-        const banner = this.scene.add.rectangle(centerX, bannerY, bannerWidth, bannerHeight, 0x2563eb)
+        const banner = this.scene.add.rectangle(centerX, bannerY, bannerWidth, bannerHeight, COLORS.WIN_BANNER_BLUE)
             .setOrigin(0.5);
         container.add(banner);
-        
+
         // Banner top highlight
-        const bannerHighlight = this.scene.add.rectangle(centerX, bannerY - 12, bannerWidth - 20, 12, 0x3b82f6)
+        const bannerHighlight = this.scene.add.rectangle(centerX, bannerY - 12, bannerWidth - 20, 12, COLORS.WIN_BANNER_HIGHLIGHT)
             .setOrigin(0.5);
         container.add(bannerHighlight);
-        
+
         // Banner bottom shadow
-        const bannerDarkShadow = this.scene.add.rectangle(centerX, bannerY + 12, bannerWidth - 20, 12, 0x1e40af)
+        const bannerDarkShadow = this.scene.add.rectangle(centerX, bannerY + 12, bannerWidth - 20, 12, COLORS.WIN_BANNER_SHADOW)
             .setOrigin(0.5);
         container.add(bannerDarkShadow);
 
@@ -68,22 +82,8 @@ export class WinPopup {
         }).setOrigin(0.5).setShadow(2, 2, '#000000', 2);
         container.add(winText);
 
-        // Display the four aces above the banner
-        const aceY = centerY - 90;
-        const aceSpacing = 55;
-        const startX = centerX - (aceSpacing * 1.5);
-        
-        const suits: Array<keyof typeof SUIT_FRAMES> = ['HEART', 'DIAMOND', 'CLUB', 'SPADE'];
-        suits.forEach((suit, index) => {
-            const aceCard = this.scene.add.image(startX + index * aceSpacing, aceY, ASSET_KEYS.CARDS)
-                .setOrigin(0.5)
-                .setScale(SCALE * 0.6)
-                .setFrame(SUIT_FRAMES[suit]);
-            container.add(aceCard);
-        });
-
         // Stats text below banner
-        const statsY = centerY + 30;
+        const statsY = centerY + 45;
         const statsStyle = {
             fontFamily: 'Courier New, monospace',
             fontSize: '18px',
@@ -96,16 +96,16 @@ export class WinPopup {
         container.add(statsText);
 
         // Restart button
-        const buttonY = centerY + 80;
+        const buttonY = centerY + 90;
         const buttonWidth = 180;
         const buttonHeight = 40;
-        
+
         // Button background
-        const buttonBg = this.scene.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, 0x2a5f2e)
-            .setStrokeStyle(3, 0x4a9f4e)
+        const buttonBg = this.scene.add.rectangle(centerX, buttonY, buttonWidth, buttonHeight, COLORS.SUIT_RED)
+            .setStrokeStyle(2, COLORS.WHITE)
             .setInteractive({ useHandCursor: true });
         container.add(buttonBg);
-        
+
         // Button text
         const buttonText = this.scene.add.text(centerX, buttonY, 'Play Again', {
             fontFamily: 'Courier New, monospace',
@@ -114,16 +114,16 @@ export class WinPopup {
             fontStyle: 'bold'
         }).setOrigin(0.5);
         container.add(buttonText);
-        
+
         // Button hover effects
         buttonBg.on('pointerover', () => {
-            buttonBg.setFillStyle(0x4a9f4e);
+            buttonBg.setFillStyle(COLORS.SUIT_RED_DARK).setStrokeStyle(2, COLORS.CREAM)
         });
-        
+
         buttonBg.on('pointerout', () => {
-            buttonBg.setFillStyle(0x2a5f2e);
+            buttonBg.setFillStyle(COLORS.SUIT_RED).setStrokeStyle(2, COLORS.WHITE)
         });
-        
+
         // Button click handler
         buttonBg.on('pointerdown', () => {
             this.fadeOutAndDestroy();

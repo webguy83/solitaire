@@ -1,19 +1,6 @@
-import { SCENE_KEYS } from "./common";
+import { SCENE_KEYS, COLORS } from "./common";
 
 export class TitleScene extends Phaser.Scene {
-    private static readonly COLORS = {
-        FELT_GREEN: 0x0B7D3E,
-        FELT_DARK: 0x085A2C,
-        BUTTON_GREEN: 0x0A6B34,
-        BUTTON_HOVER: 0x0D9245,
-        WHITE: 0xFFFFFF,
-        CREAM: 0xFFF8DC,
-        DARK_STROKE: 0x043D1A,
-        SUIT_RED: 0xDC143C,
-        SUIT_RED_DARK: 0xA01020,
-        SUIT_BLACK: 0x000000
-    } as const;
-
     constructor() {
         super({ key: SCENE_KEYS.TITLE });
     }
@@ -33,23 +20,23 @@ export class TitleScene extends Phaser.Scene {
 
     private createBackground(width: number, height: number): void {
         // Classic felt green background
-        this.add.rectangle(0, 0, width, height, TitleScene.COLORS.FELT_GREEN, 1).setOrigin(0, 0);
+        this.add.rectangle(0, 0, width, height, COLORS.FELT_GREEN, 1).setOrigin(0, 0);
 
         // Subtle darker border for depth
         const borderSize = 8;
-        this.add.rectangle(0, 0, width, borderSize, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
-        this.add.rectangle(0, height - borderSize, width, borderSize, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
-        this.add.rectangle(0, 0, borderSize, height, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
-        this.add.rectangle(width - borderSize, 0, borderSize, height, TitleScene.COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(0, 0, width, borderSize, COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(0, height - borderSize, width, borderSize, COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(0, 0, borderSize, height, COLORS.FELT_DARK, 1).setOrigin(0, 0);
+        this.add.rectangle(width - borderSize, 0, borderSize, height, COLORS.FELT_DARK, 1).setOrigin(0, 0);
     }
 
     private createDecorations(width: number, height: number): void {
         // Black suits
-        this.createSuitDecoration(60, 50, '♠', TitleScene.COLORS.SUIT_BLACK);
-        this.createSuitDecoration(width - 60, height - 50, '♣', TitleScene.COLORS.SUIT_BLACK);
+        this.createSuitDecoration(60, 50, '♠', COLORS.SUIT_BLACK);
+        this.createSuitDecoration(width - 60, height - 50, '♣', COLORS.SUIT_BLACK);
         // Red suits
-        this.createSuitDecoration(width - 60, 50, '♥', TitleScene.COLORS.SUIT_RED);
-        this.createSuitDecoration(60, height - 50, '♦', TitleScene.COLORS.SUIT_RED);
+        this.createSuitDecoration(width - 60, 50, '♥', COLORS.SUIT_RED);
+        this.createSuitDecoration(60, height - 50, '♦', COLORS.SUIT_RED);
     }
 
     private createTitle(centerX: number, centerY: number): void {
@@ -57,7 +44,7 @@ export class TitleScene extends Phaser.Scene {
             fontFamily: 'Georgia, serif',
             fontSize: '90px',
             color: '#FFFFFF',
-            stroke: `#${TitleScene.COLORS.DARK_STROKE.toString(16)}`,
+            stroke: `#${COLORS.DARK_STROKE.toString(16)}`,
             strokeThickness: 5,
             shadow: {
                 offsetX: 3,
@@ -75,7 +62,7 @@ export class TitleScene extends Phaser.Scene {
         this.add.text(centerX, centerY, '✦ Classic ✦', {
             fontFamily: 'Georgia, serif',
             fontSize: '24px',
-            color: `#${TitleScene.COLORS.CREAM.toString(16)}`,
+            color: `#${COLORS.CREAM.toString(16)}`,
             fontStyle: 'italic',
             shadow: {
                 offsetX: 2,
@@ -89,8 +76,8 @@ export class TitleScene extends Phaser.Scene {
 
     private createPlayButton(centerX: number, centerY: number): void {
         const buttonY = centerY + 90;
-        const buttonBg = this.add.rectangle(centerX, buttonY, 220, 60, TitleScene.COLORS.SUIT_RED, 1);
-        buttonBg.setStrokeStyle(4, TitleScene.COLORS.WHITE, 1);
+        const buttonBg = this.add.rectangle(centerX, buttonY, 220, 60, COLORS.SUIT_RED, 1);
+        buttonBg.setStrokeStyle(4, COLORS.WHITE, 1);
         buttonBg.setInteractive({ useHandCursor: true });
 
         const buttonText = this.add.text(centerX, buttonY, 'PLAY', {
@@ -119,7 +106,7 @@ export class TitleScene extends Phaser.Scene {
             {
                 fontFamily: 'Georgia, serif',
                 fontSize: '16px',
-                color: `#${TitleScene.COLORS.CREAM.toString(16)}`,
+                color: `#${COLORS.CREAM.toString(16)}`,
                 shadow: {
                     offsetX: 1,
                     offsetY: 1,
@@ -142,7 +129,7 @@ export class TitleScene extends Phaser.Scene {
         });
 
         this.input.on(Phaser.Input.Events.POINTER_OVER, () => {
-            buttonBg.setStrokeStyle(4, TitleScene.COLORS.CREAM, 1);
+            buttonBg.setStrokeStyle(4, COLORS.CREAM, 1);
             this.tweens.addCounter({
                 from: 0,
                 to: 1,
@@ -151,8 +138,8 @@ export class TitleScene extends Phaser.Scene {
                 onUpdate: (tween) => {
                     const value = tween.getValue() ?? 0;
                     const color = Phaser.Display.Color.Interpolate.ColorWithColor(
-                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED),
-                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED_DARK),
+                        Phaser.Display.Color.ValueToColor(COLORS.SUIT_RED),
+                        Phaser.Display.Color.ValueToColor(COLORS.SUIT_RED_DARK),
                         1,
                         value
                     );
@@ -162,7 +149,7 @@ export class TitleScene extends Phaser.Scene {
         });
 
         this.input.on(Phaser.Input.Events.POINTER_OUT, () => {
-            buttonBg.setStrokeStyle(4, TitleScene.COLORS.WHITE, 1);
+            buttonBg.setStrokeStyle(4, COLORS.WHITE, 1);
             this.tweens.addCounter({
                 from: 0,
                 to: 1,
@@ -171,8 +158,8 @@ export class TitleScene extends Phaser.Scene {
                 onUpdate: (tween) => {
                     const value = tween.getValue() ?? 0;
                     const color = Phaser.Display.Color.Interpolate.ColorWithColor(
-                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED_DARK),
-                        Phaser.Display.Color.ValueToColor(TitleScene.COLORS.SUIT_RED),
+                        Phaser.Display.Color.ValueToColor(COLORS.SUIT_RED_DARK),
+                        Phaser.Display.Color.ValueToColor(COLORS.SUIT_RED),
                         1,
                         value
                     );
@@ -209,7 +196,7 @@ export class TitleScene extends Phaser.Scene {
             fontFamily: 'Arial, sans-serif',
             fontSize: '70px',
             color: `#${color.toString(16).padStart(6, '0')}`,
-            stroke: color === TitleScene.COLORS.SUIT_BLACK ? '#666666' : '#8B0000',
+            stroke: color === COLORS.SUIT_BLACK ? '#666666' : '#8B0000',
             strokeThickness: 3
         });
         suit.setOrigin(0.5);

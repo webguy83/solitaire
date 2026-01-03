@@ -8,7 +8,7 @@ export class PreloadScene extends Phaser.Scene {
 
     preload() {
         // Load assets here
-        this.load.spritesheet(ASSET_KEYS.CARDS, 'assets/cards.png', { frameWidth: CARD_WIDTH, frameHeight: CARD_HEIGHT });
+        this.load.spritesheet(ASSET_KEYS.CARDS, 'assets/cards_3.png', { frameWidth: CARD_WIDTH, frameHeight: CARD_HEIGHT });
     }
 
     create() {

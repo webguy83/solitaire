@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS, SCALE, CARD_BACK_FRAME, SUIT_FRAMES } from './common';
+import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS, SCALE, CARD_BACK_FRAME, SUIT_FRAMES, COLORS } from './common';
 import { Solitaire } from '../lib/solitaire';
 import { Card } from '../lib/card';
 import { CardValue } from '../lib/common';
@@ -7,14 +7,21 @@ import { FoundationPile } from '../lib/foundation-pile';
 import { WinPopup } from './WinPopup';
 
 const DEBUG = false;
-const FOUNDATION_PILE_X_POSITIONS = [360, 425, 490, 555];
+const FOUNDATION_START_X = 345;
+const FOUNDATION_SPACING = 20; // Space between foundation pile cards
+const FOUNDATION_PILE_X_POSITIONS = [
+    FOUNDATION_START_X,
+    FOUNDATION_START_X + (CARD_WIDTH * SCALE) + FOUNDATION_SPACING,
+    FOUNDATION_START_X + 2 * ((CARD_WIDTH * SCALE) + FOUNDATION_SPACING),
+    FOUNDATION_START_X + 3 * ((CARD_WIDTH * SCALE) + FOUNDATION_SPACING)
+];
 const FOUNDATION_PILE_Y_POSITION = 5;
-const DISCARD_PILE_X_POSITION = 85;
+const DISCARD_PILE_X_POSITION = 105;
 const DISCARD_PILE_Y_POSITION = 5;
-const STOCK_PILE_X_POSITION = 5;
+const STOCK_PILE_X_POSITION = 25;
 const STOCK_PILE_Y_POSITION = 5;
 const TABLEAU_PILE_X_POSITION = 40;
-const TABLEAU_PILE_Y_POSITION = 92;
+const TABLEAU_PILE_Y_POSITION = 110;
 const MAX_CARD_SPACING = 25; // Maximum spacing between cards - increased for better spread
 const MIN_CARD_SPACING = 8; // Minimum spacing when heavily compressed
 
@@ -70,7 +77,7 @@ export class GameScene extends Phaser.Scene {
         // Calculate maximum tableau height based on screen dimensions
         const { height } = this.scale;
         const BOTTOM_BAR_HEIGHT = 22;
-        this.maxTableauHeight = height - TABLEAU_PILE_Y_POSITION - BOTTOM_BAR_HEIGHT - 10; // 10px padding
+        this.maxTableauHeight = height - TABLEAU_PILE_Y_POSITION - BOTTOM_BAR_HEIGHT;
 
         this.makeDrawPile();
         this.makeDiscardPile();
@@ -147,8 +154,8 @@ export class GameScene extends Phaser.Scene {
         const barHeight = 22;
         const barY = height - barHeight / 2;
 
-        // Retro gray background bar
-        this.bottomBarBg = this.add.rectangle(0, height - barHeight, width, barHeight, 0x808080)
+        // Retro green background bar
+        this.bottomBarBg = this.add.rectangle(0, height - barHeight, width, barHeight, COLORS.FELT_DARK)
             .setOrigin(0, 0)
             .setDepth(1);
 
@@ -174,25 +181,24 @@ export class GameScene extends Phaser.Scene {
         const buttonHeight = 18;
         const centerX = width / 2;
 
-        this.restartButton = this.add.rectangle(centerX, barY, buttonWidth, buttonHeight, 0x606060)
-            .setStrokeStyle(1, 0x404040)
+        this.restartButton = this.add.rectangle(centerX, barY, buttonWidth, buttonHeight, COLORS.SUIT_RED)
+            .setStrokeStyle(1, COLORS.WHITE)
             .setInteractive({ useHandCursor: true })
             .setDepth(1);
 
         this.restartButtonText = this.add.text(centerX, barY, 'New Game', {
             fontFamily: 'Courier New, monospace',
             fontSize: '14px',
-            color: '#FFFFFF',
-            fontStyle: 'bold'
+            color: `#${COLORS.WHITE.toString(16).padStart(6, '0')}`,
         }).setOrigin(0.5).setDepth(1);
 
         // Button hover effects
         this.restartButton.on('pointerover', () => {
-            this.restartButton.setFillStyle(0x707070);
+            this.restartButton.setFillStyle(COLORS.SUIT_RED_DARK);
         });
 
         this.restartButton.on('pointerout', () => {
-            this.restartButton.setFillStyle(0x606060);
+            this.restartButton.setFillStyle(COLORS.SUIT_RED);
         });
 
         // Button click handler
@@ -248,11 +254,11 @@ export class GameScene extends Phaser.Scene {
             .setVisible(false);
 
         for (let i = 0; i < 3; i++) {
-            const card = this.createCard(STOCK_PILE_X_POSITION + i * 5, STOCK_PILE_Y_POSITION, false);
+            const card = this.createCard(STOCK_PILE_X_POSITION + i * 10, STOCK_PILE_Y_POSITION, false);
             this.drawPileCards.push(card);
         }
 
-        const drawZone = this.add.zone(0, 0, CARD_WIDTH * SCALE + 20, CARD_HEIGHT * SCALE + 12).setOrigin(0).setInteractive();
+        const drawZone = this.add.zone(STOCK_PILE_X_POSITION - 10, 0, CARD_WIDTH * SCALE + 40, CARD_HEIGHT * SCALE + 12).setOrigin(0).setInteractive();
 
         drawZone.on(Phaser.Input.Events.POINTER_DOWN, () => {
             if (this.solitaire.drawPile.length === 0 && this.solitaire.discardPile.length === 0) {
@@ -324,7 +330,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createLocationBox(x: number, y: number) {
-        return this.add.rectangle(x, y, 56, 78).setOrigin(0).setStrokeStyle(2, 0x000000, .5);
+        const width = CARD_WIDTH * SCALE;
+        const height = CARD_HEIGHT * SCALE;
+        return this.add.rectangle(x, y, width, height, COLORS.LOCATION_BOX_BG, 1)
+            .setOrigin(0)
+            .setStrokeStyle(2, COLORS.LOCATION_BOX_STROKE, 0.5);
     }
 
     private createCard(x: number, y: number, draggable: boolean = true, cardIndex?: number, pileIndex?: number) {
@@ -474,17 +484,29 @@ export class GameScene extends Phaser.Scene {
 
     private createDropZones() {
         // Create 4 separate foundation zones
+        const cardWidth = CARD_WIDTH * SCALE;
+        const cardHeight = CARD_HEIGHT * SCALE;
 
         for (let i = 0; i < 4; i++) {
-            // add start width using the width of the card instead of padding for the first item
-            // don't add zone padding to the end of the last zone
-            const zonePadding = i === 0 ? 0 : 10;
-            const extraCardWidth = i === 0 ? CARD_WIDTH * SCALE : 0;
-            const extraEndWidth = i === 3 ? zonePadding + 2 : 0; // Extra width for last zone
-            const zone = this.add.zone(FOUNDATION_PILE_X_POSITIONS[i] - zonePadding - extraCardWidth, FOUNDATION_PILE_Y_POSITION, 56 + zonePadding + extraEndWidth + extraCardWidth, 78).setOrigin(0).setRectangleDropZone(56 + zonePadding + extraEndWidth + extraCardWidth, 78).setDepth(-1).setData({
-                zoneType: ZONE_TYPE.FOUNDATION,
-                pileIndex: i
-            });
+            let zoneX, zoneWidth;
+            
+            if (i === 0) {
+                // First zone: includes full card width to the left for easy dragging
+                zoneX = FOUNDATION_PILE_X_POSITIONS[i] - cardWidth;
+                zoneWidth = cardWidth * 2; // Double width to cover left area + card
+            } else {
+                zoneX = FOUNDATION_PILE_X_POSITIONS[i] - FOUNDATION_SPACING;
+                zoneWidth = cardWidth + FOUNDATION_SPACING;
+            }
+            
+            const zone = this.add.zone(zoneX, FOUNDATION_PILE_Y_POSITION, zoneWidth, cardHeight)
+                .setOrigin(0)
+                .setRectangleDropZone(zoneWidth, cardHeight)
+                .setDepth(-1)
+                .setData({
+                    zoneType: ZONE_TYPE.FOUNDATION,
+                    pileIndex: i
+                });
 
             if (DEBUG) {
                 this.add.rectangle(zone.x, zone.y, zone.width, zone.height, 0xff0000, 0.2).setOrigin(0);
@@ -492,8 +514,9 @@ export class GameScene extends Phaser.Scene {
         }
 
         // add zones for tableau piles
+        const tableauZoneWidth = cardWidth + 20; // Card width + padding
         for (let i = 0; i < 7; i++) {
-            const zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, 75.5, this.maxTableauHeight).setOrigin(0).setRectangleDropZone(75.5, this.maxTableauHeight).setData({
+            const zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, tableauZoneWidth, this.maxTableauHeight).setOrigin(0).setRectangleDropZone(tableauZoneWidth, this.maxTableauHeight).setData({
                 zoneType: ZONE_TYPE.TABLEAU,
                 pileIndex: i
             }).setDepth(-1);
@@ -915,6 +938,9 @@ export class GameScene extends Phaser.Scene {
                         .setScale(SCALE)
                         .setFrame(SUIT_FRAMES[pile.suit!] + (cardValue - 1))
                         .setDepth(1);
+
+                    pile.removeCard();
+                    this.updateFoundationPiles();
 
                     // Enable physics for this card
                     this.physics.add.existing(card);
