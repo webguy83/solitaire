@@ -15,7 +15,7 @@ export const CARD_WIDTH = 48;
 export const CARD_HEIGHT = 64;
 
 export const SCALE = 1;
-export const CARD_BACK_FRAME = 54;
+export const CARD_BACK_FRAME = 55;
 export const SUIT_FRAMES = {
     HEART: 26,
     DIAMOND: 13,
