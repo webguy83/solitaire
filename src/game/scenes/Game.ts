@@ -1,19 +1,12 @@
 import * as Phaser from 'phaser';
-import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS } from './common';
+import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS, SCALE, CARD_BACK_FRAME, SUIT_FRAMES } from './common';
 import { Solitaire } from '../lib/solitaire';
 import { Card } from '../lib/card';
+import { CardValue } from '../lib/common';
 import { FoundationPile } from '../lib/foundation-pile';
+import { WinPopup } from './WinPopup';
 
 const DEBUG = false;
-const SCALE = 1.5;
-const CARD_BACK_FRAME = 52;
-const SUIT_FRAMES = {
-    HEART: 26,
-    DIAMOND: 13,
-    SPADE: 39,
-    CLUB: 0
-}
-
 const FOUNDATION_PILE_X_POSITIONS = [360, 425, 490, 555];
 const FOUNDATION_PILE_Y_POSITION = 5;
 const DISCARD_PILE_X_POSITION = 85;
@@ -22,9 +15,8 @@ const STOCK_PILE_X_POSITION = 5;
 const STOCK_PILE_Y_POSITION = 5;
 const TABLEAU_PILE_X_POSITION = 40;
 const TABLEAU_PILE_Y_POSITION = 92;
-const MAX_TABLEAU_HEIGHT = 268; // Maximum available height for tableau piles
-const MAX_CARD_SPACING = 20; // Maximum spacing between cards
-const MIN_CARD_SPACING = 12; // Minimum spacing when compressed
+const MAX_CARD_SPACING = 25; // Maximum spacing between cards - increased for better spread
+const MIN_CARD_SPACING = 8; // Minimum spacing when heavily compressed
 
 type ZoneType = keyof typeof ZONE_TYPE;
 
@@ -40,11 +32,15 @@ export class GameScene extends Phaser.Scene {
     tableauContainers: Phaser.GameObjects.Container[] = [];
     private recycleCircle!: Phaser.GameObjects.Arc;
     private tableauPlaceholders: Phaser.GameObjects.Rectangle[] = [];
+    private maxTableauHeight: number = 0;
 
     private solitaire = new Solitaire();
     private timerText!: Phaser.GameObjects.Text;
     private movesText!: Phaser.GameObjects.Text;
     private stockText!: Phaser.GameObjects.Text;
+    private bottomBarBg!: Phaser.GameObjects.Rectangle;
+    private restartButton!: Phaser.GameObjects.Rectangle;
+    private restartButtonText!: Phaser.GameObjects.Text;
     private elapsedSeconds = 0;
     private timerEvent?: Phaser.Time.TimerEvent;
     private gameCompleted = false;
@@ -56,9 +52,25 @@ export class GameScene extends Phaser.Scene {
 
     create() {
         this.cameras.main.fadeIn(500, 0, 0, 0);
+
+        // Reset all arrays
+        this.drawPileCards = [];
+        this.discardPileCards = [];
+        this.foundationPileCards = [];
+        this.tableauContainers = [];
+        this.tableauPlaceholders = [];
+
+        // Reset game state
+        this.solitaire = new Solitaire();
         this.solitaire.newGame();
         this.elapsedSeconds = 0;
         this.gameCompleted = false;
+        this.moveCount = 0;
+
+        // Calculate maximum tableau height based on screen dimensions
+        const { height } = this.scale;
+        const BOTTOM_BAR_HEIGHT = 22;
+        this.maxTableauHeight = height - TABLEAU_PILE_Y_POSITION - BOTTOM_BAR_HEIGHT - 10; // 10px padding
 
         this.makeDrawPile();
         this.makeDiscardPile();
@@ -75,7 +87,7 @@ export class GameScene extends Phaser.Scene {
         // Press 'W' to simulate win for testing TODO REmove before production
         this.input.keyboard?.on('keydown-W', () => {
             if (this.gameCompleted) return;
-            
+
             // Set all foundation piles to King (13)
             this.solitaire.foundationPiles.forEach(pile => {
                 pile.assignSuit('HEART'); // Assign any suit
@@ -83,8 +95,50 @@ export class GameScene extends Phaser.Scene {
                     pile.addCard();
                 }
             });
-            
+
             this.updateFoundationPiles();
+        });
+
+        // Press 'M' to test max cards scenario (rightmost pile: 6 face down + K→A face up = 19 cards)
+        this.input.keyboard?.on('keydown-M', () => {
+            console.log('🧪 Testing WORST CASE: 19 cards (6 face down + 13 face up)...');
+
+            // Clear the rightmost tableau pile (index 6)
+            const pileIndex = 6;
+            this.solitaire.tableauPiles[pileIndex] = [];
+
+            // Add 6 face-down cards first
+            for (let i = 0; i < 6; i++) {
+                const suit: 'HEART' | 'SPADE' = i % 2 === 0 ? 'HEART' : 'SPADE';
+                const card = new Card(suit, 1 as CardValue, false); // Face down, value doesn't matter
+                this.solitaire.tableauPiles[pileIndex].push(card);
+            }
+
+            // Add K through A (13 cards) all face up
+            for (let value = 13; value >= 1; value--) {
+                const suit: 'HEART' | 'SPADE' = value % 2 === 0 ? 'HEART' : 'SPADE'; // Alternate red/black
+                const card = new Card(suit, value as CardValue, true);
+                this.solitaire.tableauPiles[pileIndex].push(card);
+            }
+
+            // Rebuild the visual pile
+            const container = this.tableauContainers[pileIndex];
+            container.removeAll(true);
+
+            const pile = this.solitaire.tableauPiles[pileIndex];
+            const spacing = this.calculateCardSpacing(pile.length);
+            const totalHeight = 78 + (pile.length - 1) * spacing;
+            console.log(`📏 ${pile.length} cards with ${spacing}px spacing = ${totalHeight}px total height`);
+            console.log(`📐 Available height: ${this.maxTableauHeight}px`);
+            console.log(`${totalHeight > this.maxTableauHeight ? '❌ OVERFLOW by ' + (totalHeight - this.maxTableauHeight) + 'px!' : '✅ FITS!'}`);
+
+            pile.forEach((card, cardIndex) => {
+                const cardGameObject = this.createCard(0, cardIndex * spacing, card.isFaceUp, cardIndex, pileIndex);
+                container.add(cardGameObject);
+                if (card.isFaceUp) {
+                    cardGameObject.setFrame(this.getCardFrame(card));
+                }
+            });
         });
     }
 
@@ -92,29 +146,60 @@ export class GameScene extends Phaser.Scene {
         const { width, height } = this.scale;
         const barHeight = 22;
         const barY = height - barHeight / 2;
-        
+
         // Retro gray background bar
-        this.add.rectangle(0, height - barHeight, width, barHeight, 0x808080)
+        this.bottomBarBg = this.add.rectangle(0, height - barHeight, width, barHeight, 0x808080)
             .setOrigin(0, 0)
-            .setDepth(100);
-        
+            .setDepth(1);
+
         const textStyle = {
             fontFamily: 'Courier New, monospace',
             fontSize: '16px',
             color: '#FFFFFF',
             fontStyle: 'bold'
         };
-        
-        // Score (moves) on the left
-        this.movesText = this.add.text(10, barY, 'Score: 0', textStyle)
+
+        // Moves counter on the left
+        this.movesText = this.add.text(10, barY, 'Moves: 0', textStyle)
             .setOrigin(0, 0.5)
-            .setDepth(101);
-        
+            .setDepth(1);
+
         // Timer on the right side
         this.timerText = this.add.text(width - 10, barY, 'Time: 0', textStyle)
             .setOrigin(1, 0.5)
-            .setDepth(101);
-        
+            .setDepth(1);
+
+        // Restart button in the center
+        const buttonWidth = 90;
+        const buttonHeight = 18;
+        const centerX = width / 2;
+
+        this.restartButton = this.add.rectangle(centerX, barY, buttonWidth, buttonHeight, 0x606060)
+            .setStrokeStyle(1, 0x404040)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(1);
+
+        this.restartButtonText = this.add.text(centerX, barY, 'New Game', {
+            fontFamily: 'Courier New, monospace',
+            fontSize: '14px',
+            color: '#FFFFFF',
+            fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(1);
+
+        // Button hover effects
+        this.restartButton.on('pointerover', () => {
+            this.restartButton.setFillStyle(0x707070);
+        });
+
+        this.restartButton.on('pointerout', () => {
+            this.restartButton.setFillStyle(0x606060);
+        });
+
+        // Button click handler
+        this.restartButton.on('pointerdown', () => {
+            this.scene.restart();
+        });
+
         // Stock pile count (hidden by default for retro look)
         this.stockText = this.add.text(-1000, -1000, '', textStyle)
             .setDepth(101);
@@ -125,7 +210,7 @@ export class GameScene extends Phaser.Scene {
             callbackScope: this,
             loop: true
         });
-        
+
         this.updateStockDisplay();
     }
 
@@ -133,16 +218,19 @@ export class GameScene extends Phaser.Scene {
         if (this.gameCompleted) {
             return;
         }
-        
+
         this.elapsedSeconds++;
-        this.timerText.setText(`Time: ${this.elapsedSeconds}`);
+        const minutes = Math.floor(this.elapsedSeconds / 60);
+        const seconds = this.elapsedSeconds % 60;
+        const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        this.timerText.setText(`Time: ${formattedTime}`);
     }
-    
+
     private incrementMoveCount() {
         this.moveCount++;
-        this.movesText.setText(`Score: ${this.moveCount * 10}`);
+        this.movesText.setText(`Moves: ${this.moveCount}`);
     }
-    
+
     private updateStockDisplay() {
         const stockCount = this.solitaire.drawPile.length;
         this.stockText.setText(`${stockCount} Stock`);
@@ -206,7 +294,7 @@ export class GameScene extends Phaser.Scene {
             const showCard = index < numOfCardsToShow;
             card.setVisible(showCard);
         });
-        
+
         // Show green circle when draw pile is empty and there are cards to recycle
         const showRecycleCircle = this.solitaire.drawPile.length === 0 && this.solitaire.discardPile.length > 0;
         this.recycleCircle.setVisible(showRecycleCircle);
@@ -264,21 +352,22 @@ export class GameScene extends Phaser.Scene {
     private calculateCardSpacing(pileSize: number): number {
         if (pileSize <= 1) return 0;
 
-        // Calculate the required height for all cards with max spacing
         const cardHeight = CARD_HEIGHT * SCALE;
-        const requiredHeight = cardHeight + (pileSize - 1) * MAX_CARD_SPACING;
 
-        // If it fits, use max spacing
-        if (requiredHeight <= MAX_TABLEAU_HEIGHT) {
+        // Calculate ideal spacing with max spacing
+        const idealHeight = cardHeight + (pileSize - 1) * MAX_CARD_SPACING;
+        if (idealHeight <= this.maxTableauHeight) {
             return MAX_CARD_SPACING;
         }
 
-        // Otherwise, calculate compressed spacing
-        const availableSpaceForSpacing = MAX_TABLEAU_HEIGHT - cardHeight;
-        const spacing = Math.floor(availableSpaceForSpacing / (pileSize - 1));
+        // Calculate compressed spacing to fit available space
+        const availableSpaceForSpacing = this.maxTableauHeight - cardHeight;
+        const calculatedSpacing = availableSpaceForSpacing / (pileSize - 1);
 
-        // Ensure spacing doesn't go below minimum
-        return Math.max(spacing, MIN_CARD_SPACING);
+        // Use calculated spacing, but don't go below minimum
+        const spacing = Math.max(calculatedSpacing, MIN_CARD_SPACING);
+
+        return Math.floor(spacing);
     }
 
     private makeTableauPiles() {
@@ -404,7 +493,7 @@ export class GameScene extends Phaser.Scene {
 
         // add zones for tableau piles
         for (let i = 0; i < 7; i++) {
-            const zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, 75.5, 268).setOrigin(0).setRectangleDropZone(75.5, 268).setData({
+            const zone = this.add.zone(30 + i * 85, TABLEAU_PILE_Y_POSITION, 75.5, this.maxTableauHeight).setOrigin(0).setRectangleDropZone(75.5, this.maxTableauHeight).setData({
                 zoneType: ZONE_TYPE.TABLEAU,
                 pileIndex: i
             }).setDepth(-1);
@@ -569,6 +658,7 @@ export class GameScene extends Phaser.Scene {
                     isValidMove = this.solitaire.moveTableauCardToFoundation(tableauPileIndex, i);
 
                     if (isValidMove) {
+                        this.incrementMoveCount();
                         this.handleRevealingNewTableauCards(tableauPileIndex as number);
                         card.destroy();
                         this.updateFoundationPiles();
@@ -583,12 +673,13 @@ export class GameScene extends Phaser.Scene {
                     isValidMove = this.solitaire.moveTableauCardToTableau(tableauPileIndex, cardIndex, i);
 
                     if (isValidMove) {
+                        this.incrementMoveCount();
                         this.handleTableauToTableauGameObjects(tableauPileIndex, cardIndex, i, this.tableauContainers[i].length);
                         return;
                     }
                 }
             }
-            
+
             // No valid move found for tableau card
             this.shakeCard(card);
             return;
@@ -603,6 +694,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < this.solitaire.foundationPiles.length; i++) {
             isValidMove = this.solitaire.playDiscardPileCardToFoundation(i);
             if (isValidMove) {
+                this.incrementMoveCount();
                 this.updateCardGameObjectsInDiscardPile();
                 this.updateFoundationPiles();
                 return;
@@ -613,6 +705,7 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < this.solitaire.tableauPiles.length; i++) {
             isValidMove = this.solitaire.playDiscardPileCardToTableau(i);
             if (isValidMove) {
+                this.incrementMoveCount();
                 this.addCardToTableauPile(this.tableauContainers[i].length, card.frame, i);
                 this.updateCardGameObjectsInDiscardPile();
                 return;
@@ -657,18 +750,18 @@ export class GameScene extends Phaser.Scene {
 
     private prepareCardForShake(card: Phaser.GameObjects.Image) {
         card.disableInteractive();
-        
+
         const originalOriginX = card.originX;
         const originalOriginY = card.originY;
         const originalX = card.x;
         const originalY = card.y;
-        
+
         // Adjust position when changing origin to keep card in same visual position
         const offsetX = (0.5 - originalOriginX) * card.displayWidth;
         const offsetY = (0.5 - originalOriginY) * card.displayHeight;
         card.setOrigin(0.5, 0.5);
         card.setPosition(originalX + offsetX, originalY + offsetY);
-        
+
         return { card, originalOriginX, originalOriginY, originalX, originalY };
     }
 
@@ -676,14 +769,14 @@ export class GameScene extends Phaser.Scene {
         const tableauPileIndex = gameObject.getData('pileIndex') as number | undefined;
         const cardIndex = gameObject.getData('cardIndex') as number | undefined;
         const isDiscardPileCard = gameObject.getData('isDiscardPile') as boolean | undefined;
-        
+
         const cardsToReEnable: Phaser.GameObjects.Image[] = [];
         const cardsToShake: Array<{ card: Phaser.GameObjects.Image, originalOriginX: number, originalOriginY: number, originalX: number, originalY: number }> = [];
-        
+
         if (tableauPileIndex !== undefined && cardIndex !== undefined) {
             // Handle tableau pile: disable cards below, shake cards from clicked card to top
             const container = this.tableauContainers[tableauPileIndex];
-            
+
             for (let i = 0; i < cardIndex; i++) {
                 const cardBelow = container.getAt<Phaser.GameObjects.Image>(i);
                 if (cardBelow.input?.enabled) {
@@ -691,14 +784,14 @@ export class GameScene extends Phaser.Scene {
                     cardsToReEnable.push(cardBelow);
                 }
             }
-            
+
             for (let i = cardIndex; i < container.length; i++) {
                 cardsToShake.push(this.prepareCardForShake(container.getAt<Phaser.GameObjects.Image>(i)));
             }
         } else {
             // Handle single card (discard pile or foundation)
             cardsToShake.push(this.prepareCardForShake(gameObject));
-            
+
             if (isDiscardPileCard) {
                 this.discardPileCards.forEach(discardCard => {
                     if (discardCard !== gameObject && discardCard.input?.enabled) {
@@ -723,7 +816,7 @@ export class GameScene extends Phaser.Scene {
                     card.setPosition(originalX, originalY);
                     card.setInteractive({ draggable: true });
                 });
-                
+
                 cardsToReEnable.forEach(card => {
                     card.setInteractive({ draggable: true });
                 });
@@ -772,7 +865,7 @@ export class GameScene extends Phaser.Scene {
                 this.input.setDraggable(topCard);
             }
         });
-        
+
         // Check if game is won
         if (!this.gameCompleted && this.solitaire.isWonGame) {
             this.handleGameWon();
@@ -781,25 +874,67 @@ export class GameScene extends Phaser.Scene {
 
     private handleGameWon() {
         this.gameCompleted = true;
-        
+
         if (this.timerEvent) {
             this.timerEvent.destroy();
         }
+
+        // Hide the bottom bar
+        this.bottomBarBg.setVisible(false);
+        this.movesText.setVisible(false);
+        this.timerText.setVisible(false);
+        this.restartButton.setVisible(false);
+        this.restartButtonText.setVisible(false);
         
-        // Keep showing time - it stops counting
-        this.timerText.setColor('#FFFF00');
-        this.movesText.setColor('#FFFF00');
-        
-        // Add simple victory message above the game area
-        const { width } = this.scale;
-        
-        this.add.text(width / 2, 50, 'YOU WIN!', {
-            fontFamily: 'Courier New, monospace',
-            fontSize: '32px',
-            color: '#FFFF00',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 4
-        }).setOrigin(0.5).setDepth(200);
+
+        // Start the cascading card animation
+        this.startWinAnimation();
+
+        // Show win popup with stats after a short delay
+        this.time.delayedCall(800, () => {
+            const minutes = Math.floor(this.elapsedSeconds / 60);
+            const seconds = this.elapsedSeconds % 60;
+            const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            new WinPopup(this, this.moveCount, formattedTime);
+        });
+    }
+
+    private startWinAnimation() {
+        let cardDelay = 0;
+
+        // For each foundation pile, cascade cards from K down to A
+        this.solitaire.foundationPiles.forEach((pile, pileIndex) => {
+            if (pile.suit === null || pile.value === 0) return;
+
+            const pileX = FOUNDATION_PILE_X_POSITIONS[pileIndex];
+
+            // Animate cards from King (13) down to Ace (1)
+            for (let cardValue = pile.value; cardValue >= 1; cardValue--) {
+                this.time.delayedCall(cardDelay, () => {
+                    const card = this.add.image(pileX, FOUNDATION_PILE_Y_POSITION, ASSET_KEYS.CARDS)
+                        .setScale(SCALE)
+                        .setFrame(SUIT_FRAMES[pile.suit!] + (cardValue - 1))
+                        .setDepth(1);
+
+                    // Enable physics for this card
+                    this.physics.add.existing(card);
+                    const body = card.body as Phaser.Physics.Arcade.Body;
+
+                    // Set initial velocity (shoot upward and to the side)
+                    const randomAngle = Phaser.Math.Between(-45, 45);
+                    const initialVelocityX = Math.sin(randomAngle * Math.PI / 180) * Phaser.Math.Between(100, 300);
+                    const initialVelocityY = -Phaser.Math.Between(200, 400);
+
+                    body.setVelocity(initialVelocityX, initialVelocityY);
+                    body.setGravityY(600);
+                    body.setBounce(0.7, 0.7);
+                    body.setCollideWorldBounds(true);
+                    body.setMaxVelocity(500, 1000);
+                    body.setAngularVelocity(Phaser.Math.Between(-200, 200));
+                });
+
+                cardDelay += 100; // Stagger each card by 100ms
+            }
+        });
     }
 }

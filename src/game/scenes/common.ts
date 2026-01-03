@@ -13,3 +13,12 @@ export const ASSET_KEYS  = {
 
 export const CARD_WIDTH = 37;
 export const CARD_HEIGHT = 52;
+
+export const SCALE = 1.5;
+export const CARD_BACK_FRAME = 52;
+export const SUIT_FRAMES = {
+    HEART: 26,
+    DIAMOND: 13,
+    SPADE: 39,
+    CLUB: 0
+}

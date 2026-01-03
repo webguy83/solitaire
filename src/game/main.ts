@@ -11,10 +11,17 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
         width: 640,
-        height: 360,
+        height: 480,
     },
     parent: 'game-container',
     backgroundColor: '#387F3C',
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { x: 0, y: 0 },
+            debug: false
+        }
+    },
     scene: [
         Boot,
         PreloadScene,
