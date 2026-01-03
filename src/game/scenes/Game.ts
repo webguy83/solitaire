@@ -38,8 +38,17 @@ export class GameScene extends Phaser.Scene {
     discardPileCards: Phaser.GameObjects.Image[] = [];
     foundationPileCards: Phaser.GameObjects.Image[][] = [];
     tableauContainers: Phaser.GameObjects.Container[] = [];
+    private recycleCircle!: Phaser.GameObjects.Arc;
+    private tableauPlaceholders: Phaser.GameObjects.Rectangle[] = [];
 
     private solitaire = new Solitaire();
+    private timerText!: Phaser.GameObjects.Text;
+    private movesText!: Phaser.GameObjects.Text;
+    private stockText!: Phaser.GameObjects.Text;
+    private elapsedSeconds = 0;
+    private timerEvent?: Phaser.Time.TimerEvent;
+    private gameCompleted = false;
+    private moveCount = 0;
 
     constructor() {
         super({ key: SCENE_KEYS.GAME });
@@ -48,6 +57,8 @@ export class GameScene extends Phaser.Scene {
     create() {
         this.cameras.main.fadeIn(500, 0, 0, 0);
         this.solitaire.newGame();
+        this.elapsedSeconds = 0;
+        this.gameCompleted = false;
 
         this.makeDrawPile();
         this.makeDiscardPile();
@@ -55,11 +66,98 @@ export class GameScene extends Phaser.Scene {
         this.makeTableauPiles();
         this.createDragEvents();
         this.createDropZones();
+        this.createBottomBar();
+        this.setupDebugKeys();
 
+    }
+
+    private setupDebugKeys() {
+        // Press 'W' to simulate win for testing TODO REmove before production
+        this.input.keyboard?.on('keydown-W', () => {
+            if (this.gameCompleted) return;
+            
+            // Set all foundation piles to King (13)
+            this.solitaire.foundationPiles.forEach(pile => {
+                pile.assignSuit('HEART'); // Assign any suit
+                for (let i = pile.value; i < 13; i++) {
+                    pile.addCard();
+                }
+            });
+            
+            this.updateFoundationPiles();
+        });
+    }
+
+    private createBottomBar() {
+        const { width, height } = this.scale;
+        const barHeight = 22;
+        const barY = height - barHeight / 2;
+        
+        // Retro gray background bar
+        this.add.rectangle(0, height - barHeight, width, barHeight, 0x808080)
+            .setOrigin(0, 0)
+            .setDepth(100);
+        
+        const textStyle = {
+            fontFamily: 'Courier New, monospace',
+            fontSize: '16px',
+            color: '#FFFFFF',
+            fontStyle: 'bold'
+        };
+        
+        // Score (moves) on the left
+        this.movesText = this.add.text(10, barY, 'Score: 0', textStyle)
+            .setOrigin(0, 0.5)
+            .setDepth(101);
+        
+        // Timer on the right side
+        this.timerText = this.add.text(width - 10, barY, 'Time: 0', textStyle)
+            .setOrigin(1, 0.5)
+            .setDepth(101);
+        
+        // Stock pile count (hidden by default for retro look)
+        this.stockText = this.add.text(-1000, -1000, '', textStyle)
+            .setDepth(101);
+
+        this.timerEvent = this.time.addEvent({
+            delay: 1000,
+            callback: this.updateTimer,
+            callbackScope: this,
+            loop: true
+        });
+        
+        this.updateStockDisplay();
+    }
+
+    private updateTimer() {
+        if (this.gameCompleted) {
+            return;
+        }
+        
+        this.elapsedSeconds++;
+        this.timerText.setText(`Time: ${this.elapsedSeconds}`);
+    }
+    
+    private incrementMoveCount() {
+        this.moveCount++;
+        this.movesText.setText(`Score: ${this.moveCount * 10}`);
+    }
+    
+    private updateStockDisplay() {
+        const stockCount = this.solitaire.drawPile.length;
+        this.stockText.setText(`${stockCount} Stock`);
     }
 
     private makeDrawPile() {
         this.createLocationBox(STOCK_PILE_X_POSITION, STOCK_PILE_Y_POSITION);
+
+        // Create green recycle circle (hidden initially)
+        const centerX = STOCK_PILE_X_POSITION + (CARD_WIDTH * SCALE) / 2;
+        const centerY = STOCK_PILE_Y_POSITION + (CARD_HEIGHT * SCALE) / 2;
+        this.recycleCircle = this.add.circle(centerX, centerY, 15)
+            .setStrokeStyle(5, 0x00ff00)
+            .setFillStyle(0x00ff00, 0)
+            .setVisible(false);
 
         for (let i = 0; i < 3; i++) {
             const card = this.createCard(STOCK_PILE_X_POSITION + i * 5, STOCK_PILE_Y_POSITION, false);
@@ -83,6 +181,7 @@ export class GameScene extends Phaser.Scene {
 
             this.solitaire.drawCard();
             this.showCardsInDrawPile();
+            this.updateStockDisplay();
 
             this.discardPileCards[0].setFrame(this.discardPileCards[1].frame).setVisible(this.discardPileCards[1].visible);
             const card = this.solitaire.discardPile[this.solitaire.discardPile.length - 1];
@@ -107,6 +206,10 @@ export class GameScene extends Phaser.Scene {
             const showCard = index < numOfCardsToShow;
             card.setVisible(showCard);
         });
+        
+        // Show green circle when draw pile is empty and there are cards to recycle
+        const showRecycleCircle = this.solitaire.drawPile.length === 0 && this.solitaire.discardPile.length > 0;
+        this.recycleCircle.setVisible(showRecycleCircle);
     }
 
     private makeDiscardPile() {
@@ -133,7 +236,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createLocationBox(x: number, y: number) {
-        this.add.rectangle(x, y, 56, 78).setOrigin(0).setStrokeStyle(2, 0x000000, .5);
+        return this.add.rectangle(x, y, 56, 78).setOrigin(0).setStrokeStyle(2, 0x000000, .5);
     }
 
     private createCard(x: number, y: number, draggable: boolean = true, cardIndex?: number, pileIndex?: number) {
@@ -182,6 +285,13 @@ export class GameScene extends Phaser.Scene {
         this.tableauContainers = [];
 
         this.solitaire.tableauPiles.forEach((pile, pileIndex) => {
+            // Create placeholder box for empty piles
+            const placeholder = this.createLocationBox(
+                TABLEAU_PILE_X_POSITION + pileIndex * 85,
+                TABLEAU_PILE_Y_POSITION
+            );
+            this.tableauPlaceholders.push(placeholder);
+
             const tableauContainer = this.add.container(TABLEAU_PILE_X_POSITION + pileIndex * 85, TABLEAU_PILE_Y_POSITION, []);
             this.tableauContainers.push(tableauContainer);
 
@@ -346,6 +456,8 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
+        this.incrementMoveCount();
+
         if (isCardFomDiscardPile) {
             this.updateCardGameObjectsInDiscardPile();
         } else if (isCardFromFoundation) {
@@ -382,6 +494,8 @@ export class GameScene extends Phaser.Scene {
         if (!isValidMove) {
             return;
         }
+
+        this.incrementMoveCount();
 
         if (isCardFromDiscardPile || isCardFromFoundation) {
             this.addCardToTableauPile(originalPileSize, gameObject.frame, targetTableauIndex);
@@ -658,5 +772,34 @@ export class GameScene extends Phaser.Scene {
                 this.input.setDraggable(topCard);
             }
         });
+        
+        // Check if game is won
+        if (!this.gameCompleted && this.solitaire.isWonGame) {
+            this.handleGameWon();
+        }
+    }
+
+    private handleGameWon() {
+        this.gameCompleted = true;
+        
+        if (this.timerEvent) {
+            this.timerEvent.destroy();
+        }
+        
+        // Keep showing time - it stops counting
+        this.timerText.setColor('#FFFF00');
+        this.movesText.setColor('#FFFF00');
+        
+        // Add simple victory message above the game area
+        const { width } = this.scale;
+        
+        this.add.text(width / 2, 50, 'YOU WIN!', {
+            fontFamily: 'Courier New, monospace',
+            fontSize: '32px',
+            color: '#FFFF00',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(200);
     }
 }

@@ -72,7 +72,7 @@ export class TitleScene extends Phaser.Scene {
     }
 
     private createSubtitle(centerX: number, centerY: number): void {
-        this.add.text(centerX, centerY, '✦ Classic Card Game ✦', {
+        this.add.text(centerX, centerY, '✦ Classic ✦', {
             fontFamily: 'Georgia, serif',
             fontSize: '24px',
             color: `#${TitleScene.COLORS.CREAM.toString(16)}`,
