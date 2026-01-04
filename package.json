@@ -21,7 +21,8 @@
     },
     "devDependencies": {
         "typescript": "~5.7.2",
-        "vite": "^6.3.1"
+        "vite": "^6.3.1",
+        "vite-plugin-pwa": "^0.21.2"
     },
     "dependencies": {
         "phaser": "^3.90.0",

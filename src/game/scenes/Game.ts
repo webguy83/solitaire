@@ -103,7 +103,7 @@ export class GameScene extends Phaser.Scene {
         // Update all face-down cards in draw pile
         this.drawPileCards.forEach(card => {
             // Only update if the card is currently showing a card back
-            if (CARD_BACK_FRAMES.includes(card.frame.name)) {
+            if (CARD_BACK_FRAMES.includes(parseInt(card.frame.name, 10))) {
                 card.setFrame(frame);
             }
         });
@@ -112,7 +112,7 @@ export class GameScene extends Phaser.Scene {
         this.tableauContainers.forEach((container) => {
             container.each((card: Phaser.GameObjects.Image) => {
                 // Only update if the card is currently showing a card back
-                if (CARD_BACK_FRAMES.includes(card.frame.name)) {
+                if (CARD_BACK_FRAMES.includes(parseInt(card.frame.name, 10))) {
                     card.setFrame(frame);
                 }
             });
