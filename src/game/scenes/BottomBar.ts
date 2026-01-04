@@ -65,11 +65,11 @@ export class BottomBar {
 
         // Button hover effects
         this.restartButton.on('pointerover', () => {
-            this.restartButton.setFillStyle(COLORS.SUIT_RED_DARK);
+            this.restartButton.setFillStyle(COLORS.SUIT_RED_DARK).setStrokeStyle(1, COLORS.CREAM);
         });
 
         this.restartButton.on('pointerout', () => {
-            this.restartButton.setFillStyle(COLORS.SUIT_RED);
+            this.restartButton.setFillStyle(COLORS.SUIT_RED).setStrokeStyle(1, COLORS.WHITE);
         });
 
         // Button click handler

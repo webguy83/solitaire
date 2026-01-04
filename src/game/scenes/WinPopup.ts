@@ -36,14 +36,14 @@ export class WinPopup {
 
         // Display the four aces at top
         const aceY = centerY - 75;
-        const aceSpacing = 55;
+        const aceSpacing = 65;
         const startX = centerX - (aceSpacing * 1.5);
 
         const suits: Array<keyof typeof SUIT_FRAMES> = ['HEART', 'DIAMOND', 'CLUB', 'SPADE'];
         suits.forEach((suit, index) => {
             const aceCard = this.scene.add.image(startX + index * aceSpacing, aceY, ASSET_KEYS.CARDS)
                 .setOrigin(0.5)
-                .setScale(SCALE)
+                .setScale(SCALE * .8)
                 .setFrame(SUIT_FRAMES[suit]);
             container.add(aceCard);
         });
