@@ -102,7 +102,8 @@ export class GameScene extends Phaser.Scene {
         
         // Update all face-down cards in draw pile
         this.drawPileCards.forEach(card => {
-            if (!card.getData('faceUp')) {
+            // Only update if the card is currently showing a card back
+            if (CARD_BACK_FRAMES.includes(card.frame.name)) {
                 card.setFrame(frame);
             }
         });
@@ -110,7 +111,8 @@ export class GameScene extends Phaser.Scene {
         // Update all face-down cards in tableau piles
         this.tableauContainers.forEach((container) => {
             container.each((card: Phaser.GameObjects.Image) => {
-                if (!card.getData('faceUp')) {
+                // Only update if the card is currently showing a card back
+                if (CARD_BACK_FRAMES.includes(card.frame.name)) {
                     card.setFrame(frame);
                 }
             });
@@ -276,7 +278,6 @@ export class GameScene extends Phaser.Scene {
                 tableauContainer.add(cardGameObject);
                 if (card.isFaceUp) {
                     cardGameObject.setFrame(this.getCardFrame(card));
-                    cardGameObject.setData('faceUp', true);
                 }
 
             });
@@ -526,7 +527,6 @@ export class GameScene extends Phaser.Scene {
         const card = tableauPile[tableauPile.length - 1];
         const cardGameObject = this.tableauContainers[sourceTableauIndex].getAt<Phaser.GameObjects.Image>(tableauPile.length - 1);
         cardGameObject.setFrame(this.getCardFrame(card));
-        cardGameObject.setData('faceUp', true);
         this.input.setDraggable(cardGameObject);
 
         cardGameObject.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
