@@ -1,6 +1,8 @@
 # Solitaire
 
-Classic Klondike Solitaire built with Phaser 3 and TypeScript.
+Classic Klondike Solitaire built with Phaser 3 and TypeScript. Optimized for Desktop.
+
+Live Game Demo: https://webguy83.github.io/solitaire/
 
 ![Solitaire Game](screenshot.png)
 
