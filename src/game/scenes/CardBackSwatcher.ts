@@ -18,8 +18,8 @@ export class CardBackSwatcher {
 
     private createSwatcher(x: number, y: number): Phaser.GameObjects.Container {
         const container = this.scene.add.container(x, y).setDepth(1);
-        const swatchSize = 15;
-        const spacing = 4;
+        const swatchSize = 10;
+        const spacing = 8;
         const totalWidth = (swatchSize * 4) + (spacing * 3);
 
         CARD_BACK_FRAMES.forEach((frame, index) => {

@@ -14,7 +14,7 @@ export const ASSET_KEYS  = {
 export const CARD_WIDTH = 48;
 export const CARD_HEIGHT = 64;
 
-export const SCALE = 1;
+export const SCALE = 1.5;
 export const CARD_BACK_FRAME = 52;
 export const CARD_BACK_FRAMES = [CARD_BACK_FRAME, 53, 54, 55];
 export const SUIT_FRAMES = {

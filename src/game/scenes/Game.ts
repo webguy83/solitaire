@@ -7,8 +7,8 @@ import { WinPopup } from './WinPopup';
 import { BottomBar } from './BottomBar';
 
 const DEBUG = false;
-const FOUNDATION_START_X = 345;
-const FOUNDATION_SPACING = 20; // Space between foundation pile cards
+const FOUNDATION_START_X = 280;
+const FOUNDATION_SPACING = 18; // Space between foundation pile cards
 const FOUNDATION_PILE_X_POSITIONS = [
     FOUNDATION_START_X,
     FOUNDATION_START_X + (CARD_WIDTH * SCALE) + FOUNDATION_SPACING,
@@ -16,7 +16,7 @@ const FOUNDATION_PILE_X_POSITIONS = [
     FOUNDATION_START_X + 3 * ((CARD_WIDTH * SCALE) + FOUNDATION_SPACING)
 ];
 const FOUNDATION_PILE_Y_POSITION = 5;
-const STOCK_PILE_X_POSITION = 40;
+const STOCK_PILE_X_POSITION = 18;
 const STOCK_PILE_Y_POSITION = 5;
 const DISCARD_PILE_X_POSITION = STOCK_PILE_X_POSITION + CARD_WIDTH * SCALE + 36;
 const DISCARD_PILE_Y_POSITION = 5;
