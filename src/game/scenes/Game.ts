@@ -1,8 +1,7 @@
 import * as Phaser from 'phaser';
-import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS, SCALE, CARD_BACK_FRAME, SUIT_FRAMES, COLORS } from './common';
+import { ASSET_KEYS, CARD_HEIGHT, CARD_WIDTH, SCENE_KEYS, SCALE, CARD_BACK_FRAME, SUIT_FRAMES, COLORS, CARD_BACK_FRAMES } from './common';
 import { Solitaire } from '../lib/solitaire';
 import { Card } from '../lib/card';
-import { CardValue } from '../lib/common';
 import { FoundationPile } from '../lib/foundation-pile';
 import { WinPopup } from './WinPopup';
 import { BottomBar } from './BottomBar';
@@ -45,9 +44,22 @@ export class GameScene extends Phaser.Scene {
     private solitaire = new Solitaire();
     private bottomBar!: BottomBar;
     private gameCompleted = false;
+    private currentCardBackFrame: number = this.loadCardBackFrame();
 
     constructor() {
         super({ key: SCENE_KEYS.GAME });
+    }
+
+    private loadCardBackFrame(): number {
+        const stored = localStorage.getItem('cardBackFrame');
+        if (stored) {
+            const frame = parseInt(stored, 10);
+            // Validate the frame is one of the valid options
+            if (CARD_BACK_FRAMES.includes(frame)) {
+                return frame;
+            }
+        }
+        return CARD_BACK_FRAME;
     }
 
     create() {
@@ -76,71 +88,34 @@ export class GameScene extends Phaser.Scene {
         this.makeTableauPiles();
         this.createDragEvents();
         this.createDropZones();
-        this.bottomBar = new BottomBar(this, () => this.scene.restart());
-        this.setupDebugKeys();
-
+        this.bottomBar = new BottomBar(
+            this,
+            () => this.scene.restart(),
+            (frame) => this.changeCardBack(frame),
+            this.currentCardBackFrame
+        );
     }
 
-    private setupDebugKeys() {
-        // Press 'W' to simulate win for testing TODO REmove before production
-        this.input.keyboard?.on('keydown-W', () => {
-            if (this.gameCompleted) return;
-
-            // Set all foundation piles to King (13)
-            this.solitaire.foundationPiles.forEach(pile => {
-                pile.assignSuit('HEART'); // Assign any suit
-                for (let i = pile.value; i < 13; i++) {
-                    pile.addCard();
-                }
-            });
-
-            this.updateFoundationPiles();
+    private changeCardBack(frame: number): void {
+        this.currentCardBackFrame = frame;
+        localStorage.setItem('cardBackFrame', frame.toString());
+        
+        // Update all face-down cards in draw pile
+        this.drawPileCards.forEach(card => {
+            if (!card.getData('faceUp')) {
+                card.setFrame(frame);
+            }
         });
-
-        // Press 'M' to test max cards scenario (rightmost pile: 6 face down + K→A face up = 19 cards)
-        this.input.keyboard?.on('keydown-M', () => {
-            console.log('🧪 Testing WORST CASE: 19 cards (6 face down + 13 face up)...');
-
-            // Clear the rightmost tableau pile (index 6)
-            const pileIndex = 6;
-            this.solitaire.tableauPiles[pileIndex] = [];
-
-            // Add 6 face-down cards first
-            for (let i = 0; i < 6; i++) {
-                const suit: 'HEART' | 'SPADE' = i % 2 === 0 ? 'HEART' : 'SPADE';
-                const card = new Card(suit, 1 as CardValue, false); // Face down, value doesn't matter
-                this.solitaire.tableauPiles[pileIndex].push(card);
-            }
-
-            // Add K through A (13 cards) all face up
-            for (let value = 13; value >= 1; value--) {
-                const suit: 'HEART' | 'SPADE' = value % 2 === 0 ? 'HEART' : 'SPADE'; // Alternate red/black
-                const card = new Card(suit, value as CardValue, true);
-                this.solitaire.tableauPiles[pileIndex].push(card);
-            }
-
-            // Rebuild the visual pile
-            const container = this.tableauContainers[pileIndex];
-            container.removeAll(true);
-
-            const pile = this.solitaire.tableauPiles[pileIndex];
-            const spacing = this.calculateCardSpacing(pile.length);
-            const totalHeight = 78 + (pile.length - 1) * spacing;
-            console.log(`📏 ${pile.length} cards with ${spacing}px spacing = ${totalHeight}px total height`);
-            console.log(`📐 Available height: ${this.maxTableauHeight}px`);
-            console.log(`${totalHeight > this.maxTableauHeight ? '❌ OVERFLOW by ' + (totalHeight - this.maxTableauHeight) + 'px!' : '✅ FITS!'}`);
-
-            pile.forEach((card, cardIndex) => {
-                const cardGameObject = this.createCard(0, cardIndex * spacing, card.isFaceUp, cardIndex, pileIndex);
-                container.add(cardGameObject);
-                if (card.isFaceUp) {
-                    cardGameObject.setFrame(this.getCardFrame(card));
+        
+        // Update all face-down cards in tableau piles
+        this.tableauContainers.forEach((container) => {
+            container.each((card: Phaser.GameObjects.Image) => {
+                if (!card.getData('faceUp')) {
+                    card.setFrame(frame);
                 }
             });
         });
     }
-
-
 
     private makeDrawPile() {
         this.createLocationBox(STOCK_PILE_X_POSITION, STOCK_PILE_Y_POSITION);
@@ -237,13 +212,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     private createCard(x: number, y: number, draggable: boolean = true, cardIndex?: number, pileIndex?: number) {
-        const card = this.add.image(x, y, ASSET_KEYS.CARDS, CARD_BACK_FRAME).setOrigin(0).setScale(SCALE).setInteractive({
+        const card = this.add.image(x, y, ASSET_KEYS.CARDS, this.currentCardBackFrame).setOrigin(0).setScale(SCALE).setInteractive({
             draggable
         }).setData({
             x,
             y,
             cardIndex,
-            pileIndex
+            pileIndex,
+            faceUp: false
         })
 
         if (draggable) {
@@ -300,6 +276,7 @@ export class GameScene extends Phaser.Scene {
                 tableauContainer.add(cardGameObject);
                 if (card.isFaceUp) {
                     cardGameObject.setFrame(this.getCardFrame(card));
+                    cardGameObject.setData('faceUp', true);
                 }
 
             });
@@ -549,6 +526,7 @@ export class GameScene extends Phaser.Scene {
         const card = tableauPile[tableauPile.length - 1];
         const cardGameObject = this.tableauContainers[sourceTableauIndex].getAt<Phaser.GameObjects.Image>(tableauPile.length - 1);
         cardGameObject.setFrame(this.getCardFrame(card));
+        cardGameObject.setData('faceUp', true);
         this.input.setDraggable(cardGameObject);
 
         cardGameObject.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
@@ -802,7 +780,7 @@ export class GameScene extends Phaser.Scene {
         this.startWinAnimation();
 
         // Show win popup with stats after a short delay
-        this.time.delayedCall(800, () => {
+        this.time.delayedCall(2000, () => {
             const minutes = Math.floor(this.bottomBar.getElapsedSeconds() / 60);
             const seconds = this.bottomBar.getElapsedSeconds() % 60;
             const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;

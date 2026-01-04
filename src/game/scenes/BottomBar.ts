@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { COLORS } from './common';
+import { CardBackSwatcher } from './CardBackSwatcher';
 
 export class BottomBar {
     private scene: Phaser.Scene;
@@ -8,17 +9,18 @@ export class BottomBar {
     private movesText: Phaser.GameObjects.Text;
     private restartButton: Phaser.GameObjects.Rectangle;
     private restartButtonText: Phaser.GameObjects.Text;
+    private swatcher: CardBackSwatcher;
     private timerEvent?: Phaser.Time.TimerEvent;
     private elapsedSeconds: number = 0;
     private moveCount: number = 0;
     private gameCompleted: boolean = false;
 
-    constructor(scene: Phaser.Scene, onRestartCallback: () => void) {
+    constructor(scene: Phaser.Scene, onRestartCallback: () => void, onCardBackChange: (frame: number) => void, initialCardBackFrame: number = 52) {
         this.scene = scene;
-        this.createBottomBar(onRestartCallback);
+        this.createBottomBar(onRestartCallback, onCardBackChange, initialCardBackFrame);
     }
 
-    private createBottomBar(onRestartCallback: () => void) {
+    private createBottomBar(onRestartCallback: () => void, onCardBackChange: (frame: number) => void, initialCardBackFrame: number) {
         const { width, height } = this.scene.scale;
         const barHeight = 22;
         const barY = height - barHeight / 2;
@@ -75,6 +77,10 @@ export class BottomBar {
             onRestartCallback();
         });
 
+        // Card back swatcher (positioned left of restart button)
+        const swatcherX = centerX - buttonWidth / 2 - 60;
+        this.swatcher = new CardBackSwatcher(this.scene, swatcherX, barY + 1, onCardBackChange, initialCardBackFrame);
+
         this.timerEvent = this.scene.time.addEvent({
             delay: 1000,
             callback: this.updateTimer,
@@ -127,7 +133,8 @@ export class BottomBar {
         this.timerText.destroy();
         this.movesText.destroy();
         this.restartButton.destroy();
-        this.restartButtonText.destroy();
+        this.restartButtonText.destroy();       
+         this.swatcher.destroy();    
     }
 
     private hide() {
@@ -136,5 +143,6 @@ export class BottomBar {
         this.movesText.setVisible(false);
         this.restartButton.setVisible(false);
         this.restartButtonText.setVisible(false);
+        this.swatcher.destroy();
     }
 }

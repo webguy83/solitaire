@@ -102,7 +102,7 @@ export class TitleScene extends Phaser.Scene {
         const footerText = this.add.text(
             centerX,
             height - 25,
-            `© ${new Date().getFullYear()} - Press PLAY to Start`,
+            'Press PLAY to Start',
             {
                 fontFamily: 'Georgia, serif',
                 fontSize: '16px',
