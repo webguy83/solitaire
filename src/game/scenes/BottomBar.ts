@@ -59,7 +59,7 @@ export class BottomBar {
 
         this.restartButtonText = this.scene.add.text(centerX, barY, 'New Game', {
             fontFamily: 'Courier New, monospace',
-            fontSize: '14px',
+            fontSize: '16px',
             color: `#${COLORS.WHITE.toString(16).padStart(6, '0')}`,
         }).setOrigin(0.5).setDepth(1);
 
